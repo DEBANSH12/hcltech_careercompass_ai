@@ -1,0 +1,132 @@
+[
+  {
+    "title": "Personal Portfolio Website",
+    "skill_tag": "Software Development Engineer",
+    "level": "Beginner"
+  },
+  {
+    "title": "Student Attendance Tracker (CLI + SQLite)",
+    "skill_tag": "Software Development Engineer",
+    "level": "Beginner"
+  },
+  {
+    "title": "Weather App with Public API",
+    "skill_tag": "Frontend Web Developer",
+    "level": "Beginner"
+  },
+  {
+    "title": "E-commerce UI Clone (React)",
+    "skill_tag": "Frontend Web Developer",
+    "level": "Intermediate"
+  },
+  {
+    "title": "Blog Platform REST API",
+    "skill_tag": "Backend Developer",
+    "level": "Beginner"
+  },
+  {
+    "title": "URL Shortener Service",
+    "skill_tag": "Backend Developer",
+    "level": "Intermediate"
+  },
+  {
+    "title": "Sales Data Dashboard (Pandas + Plotly)",
+    "skill_tag": "Data / ML Analyst",
+    "level": "Beginner"
+  },
+  {
+    "title": "Movie Recommendation System",
+    "skill_tag": "Data / ML Analyst",
+    "level": "Intermediate"
+  },
+  {
+    "title": "Handwritten Digit Classifier",
+    "skill_tag": "AI / ML Engineer",
+    "level": "Beginner"
+  },
+  {
+    "title": "Spam Email Detector",
+    "skill_tag": "AI / ML Engineer",
+    "level": "Intermediate"
+  },
+  {
+    "title": "Automated Login Test Suite (Selenium)",
+    "skill_tag": "QA / Test Engineer",
+    "level": "Beginner"
+  },
+  {
+    "title": "REST API Test Automation Framework",
+    "skill_tag": "QA / Test Engineer",
+    "level": "Intermediate"
+  },
+  {
+    "title": "Dockerized To-Do App with CI/CD",
+    "skill_tag": "DevOps / Cloud Support Engineer",
+    "level": "Intermediate"
+  },
+  {
+    "title": "Static Website Auto-Deploy Pipeline",
+    "skill_tag": "DevOps / Cloud Support Engineer",
+    "level": "Beginner"
+  },
+  {
+    "title": "Home Network Vulnerability Scan Report",
+    "skill_tag": "Cybersecurity Analyst",
+    "level": "Beginner"
+  },
+  {
+    "title": "Basic CTF Challenge Writeups",
+    "skill_tag": "Cybersecurity Analyst",
+    "level": "Intermediate"
+  },
+  {
+    "title": "Home Automation with ESP32",
+    "skill_tag": "Embedded / Core Electronics Engineer",
+    "level": "Beginner"
+  },
+  {
+    "title": "IoT Weather Station",
+    "skill_tag": "Embedded / Core Electronics Engineer",
+    "level": "Intermediate"
+  },
+  {
+    "title": "4-bit ALU Design in Verilog",
+    "skill_tag": "VLSI / Chip Design Engineer",
+    "level": "Beginner"
+  },
+  {
+    "title": "Traffic Light Controller (FPGA Sim)",
+    "skill_tag": "VLSI / Chip Design Engineer",
+    "level": "Intermediate"
+  },
+  {
+    "title": "Solar Panel Load Simulation (MATLAB)",
+    "skill_tag": "Power Systems / Electrical Engineer",
+    "level": "Beginner"
+  },
+  {
+    "title": "Line-Following Robot",
+    "skill_tag": "Robotics Engineer",
+    "level": "Beginner"
+  },
+  {
+    "title": "Robotic Arm Prototype (Arduino)",
+    "skill_tag": "Robotics Engineer",
+    "level": "Intermediate"
+  },
+  {
+    "title": "3D Printed Mechanical Assembly (CAD)",
+    "skill_tag": "Mechanical Design / CAD Engineer",
+    "level": "Beginner"
+  },
+  {
+    "title": "Small Bridge Model \u2014 Structural Analysis Report",
+    "skill_tag": "Structural / Site Engineer",
+    "level": "Beginner"
+  },
+  {
+    "title": "Building Material Cost Estimation Sheet",
+    "skill_tag": "Civil Planning / Estimation Engineer",
+    "level": "Beginner"
+  }
+]

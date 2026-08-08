@@ -1,0 +1,157 @@
+[
+  {
+    "id": "S1",
+    "branch": "CSE",
+    "year": 3,
+    "skills": [
+      "Python",
+      "Git",
+      "SQL"
+    ],
+    "role_family": "Software Development Engineer"
+  },
+  {
+    "id": "S2",
+    "branch": "ECE",
+    "year": 2,
+    "skills": [
+      "C/C++",
+      "Microcontrollers"
+    ],
+    "role_family": "Embedded / Core Electronics Engineer"
+  },
+  {
+    "id": "S3",
+    "branch": "CSE",
+    "year": 4,
+    "skills": [
+      "Python",
+      "Pandas",
+      "Statistics",
+      "SQL"
+    ],
+    "role_family": "Data / ML Analyst"
+  },
+  {
+    "id": "S4",
+    "branch": "IT",
+    "year": 3,
+    "skills": [
+      "Manual Testing",
+      "Python"
+    ],
+    "role_family": "QA / Test Engineer"
+  },
+  {
+    "id": "S5",
+    "branch": "CSE",
+    "year": 3,
+    "skills": [
+      "Linux",
+      "Git",
+      "Docker"
+    ],
+    "role_family": "DevOps / Cloud Support Engineer"
+  },
+  {
+    "id": "S6",
+    "branch": "IT",
+    "year": 3,
+    "skills": [
+      "HTML/CSS",
+      "JavaScript",
+      "Git"
+    ],
+    "role_family": "Frontend Web Developer"
+  },
+  {
+    "id": "S7",
+    "branch": "CSE",
+    "year": 4,
+    "skills": [
+      "Python",
+      "Machine Learning Basics",
+      "NumPy"
+    ],
+    "role_family": "AI / ML Engineer"
+  },
+  {
+    "id": "S8",
+    "branch": "CSE",
+    "year": 3,
+    "skills": [
+      "Networking Basics",
+      "Linux"
+    ],
+    "role_family": "Cybersecurity Analyst"
+  },
+  {
+    "id": "S9",
+    "branch": "ME",
+    "year": 3,
+    "skills": [
+      "CAD Software",
+      "Engineering Drawing"
+    ],
+    "role_family": "Mechanical Design / CAD Engineer"
+  },
+  {
+    "id": "S10",
+    "branch": "ME",
+    "year": 2,
+    "skills": [
+      "CAD Software"
+    ],
+    "role_family": "Robotics Engineer"
+  },
+  {
+    "id": "S11",
+    "branch": "Civil",
+    "year": 3,
+    "skills": [
+      "AutoCAD",
+      "Excel"
+    ],
+    "role_family": "Structural / Site Engineer"
+  },
+  {
+    "id": "S12",
+    "branch": "Civil",
+    "year": 4,
+    "skills": [
+      "AutoCAD",
+      "Estimation & Costing"
+    ],
+    "role_family": "Civil Planning / Estimation Engineer"
+  },
+  {
+    "id": "S13",
+    "branch": "EE",
+    "year": 3,
+    "skills": [
+      "Circuit Design",
+      "MATLAB/Simulink"
+    ],
+    "role_family": "Power Systems / Electrical Engineer"
+  },
+  {
+    "id": "S14",
+    "branch": "ECE",
+    "year": 4,
+    "skills": [
+      "Verilog/VHDL",
+      "Digital Logic Design"
+    ],
+    "role_family": "VLSI / Chip Design Engineer"
+  },
+  {
+    "id": "S15",
+    "branch": "IT",
+    "year": 2,
+    "skills": [
+      "Python",
+      "SQL"
+    ],
+    "role_family": "Backend Developer"
+  }
+]

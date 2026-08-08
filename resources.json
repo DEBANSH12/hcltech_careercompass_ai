@@ -1,0 +1,87 @@
+[
+  {
+    "resource": "CS50 (Harvard, free)",
+    "skill_tag": "Python",
+    "type": "Free"
+  },
+  {
+    "resource": "NPTEL Data Structures",
+    "skill_tag": "Data Structures & Algorithms",
+    "type": "Free"
+  },
+  {
+    "resource": "freeCodeCamp SQL Course",
+    "skill_tag": "SQL",
+    "type": "Free"
+  },
+  {
+    "resource": "freeCodeCamp Responsive Web Design",
+    "skill_tag": "HTML/CSS",
+    "type": "Free"
+  },
+  {
+    "resource": "React Official Tutorial",
+    "skill_tag": "React",
+    "type": "Free"
+  },
+  {
+    "resource": "Kaggle Micro-Courses",
+    "skill_tag": "Pandas",
+    "type": "Free"
+  },
+  {
+    "resource": "Google Machine Learning Crash Course",
+    "skill_tag": "Machine Learning Basics",
+    "type": "Free"
+  },
+  {
+    "resource": "Selenium with Python (docs)",
+    "skill_tag": "Selenium",
+    "type": "Free"
+  },
+  {
+    "resource": "Docker Official Get Started",
+    "skill_tag": "Docker",
+    "type": "Free"
+  },
+  {
+    "resource": "AWS Cloud Practitioner Essentials",
+    "skill_tag": "Cloud Basics (AWS/Azure/GCP)",
+    "type": "Free"
+  },
+  {
+    "resource": "TryHackMe Intro to Cybersecurity",
+    "skill_tag": "Security Fundamentals",
+    "type": "Free"
+  },
+  {
+    "resource": "Arduino Project Hub",
+    "skill_tag": "Microcontrollers",
+    "type": "Free"
+  },
+  {
+    "resource": "NPTEL Digital Circuits & Systems",
+    "skill_tag": "Digital Logic Design",
+    "type": "Free"
+  },
+  {
+    "resource": "NPTEL Power Systems",
+    "skill_tag": "Power Systems Basics",
+    "type": "Free"
+  },
+  {
+    "resource": "Autodesk AutoCAD Free Tutorials",
+    "skill_tag": "AutoCAD",
+    "type": "Free"
+  },
+  {
+    "resource": "NPTEL Structural Analysis",
+    "skill_tag": "Structural Analysis Basics",
+    "type": "Free"
+  },
+  {
+    "resource": "SolidWorks Student Tutorials",
+    "skill_tag": "SolidWorks/AutoCAD",
+    "type": "Free"
+  }
+]

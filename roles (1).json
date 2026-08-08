@@ -1,0 +1,274 @@
+[
+  {
+    "role_id": "software_dev",
+    "name": "Software Development Engineer",
+    "branches": [
+      "CSE",
+      "IT"
+    ],
+    "description": "Builds and maintains applications, APIs, and backend/frontend systems.",
+    "required_skills": [
+      "Python",
+      "Data Structures & Algorithms",
+      "Git",
+      "REST APIs",
+      "SQL",
+      "OOP"
+    ],
+    "entry_expectation": "Comfortable writing clean code, basic DSA, at least one full project on GitHub."
+  },
+  {
+    "role_id": "frontend_dev",
+    "name": "Frontend Web Developer",
+    "branches": [
+      "CSE",
+      "IT"
+    ],
+    "description": "Builds user-facing web interfaces and interactive UI components.",
+    "required_skills": [
+      "HTML/CSS",
+      "JavaScript",
+      "React",
+      "Git",
+      "REST APIs",
+      "Responsive Design"
+    ],
+    "entry_expectation": "Has built and deployed at least one responsive multi-page website or web app."
+  },
+  {
+    "role_id": "backend_dev",
+    "name": "Backend Developer",
+    "branches": [
+      "CSE",
+      "IT"
+    ],
+    "description": "Designs and maintains server-side logic, databases, and APIs.",
+    "required_skills": [
+      "Python",
+      "SQL",
+      "REST APIs",
+      "Databases",
+      "Git",
+      "OOP"
+    ],
+    "entry_expectation": "Can design a basic database schema and build a working REST API."
+  },
+  {
+    "role_id": "data_analyst",
+    "name": "Data / ML Analyst",
+    "branches": [
+      "CSE",
+      "IT",
+      "EE"
+    ],
+    "description": "Works with data pipelines, dashboards, and applies ML models to business problems.",
+    "required_skills": [
+      "Python",
+      "SQL",
+      "Pandas",
+      "Statistics",
+      "Data Visualization",
+      "Excel"
+    ],
+    "entry_expectation": "Can clean and analyze a dataset end-to-end and present findings clearly."
+  },
+  {
+    "role_id": "ml_engineer",
+    "name": "AI / ML Engineer",
+    "branches": [
+      "CSE",
+      "IT",
+      "ECE"
+    ],
+    "description": "Builds and trains machine learning models and integrates them into applications.",
+    "required_skills": [
+      "Python",
+      "Machine Learning Basics",
+      "NumPy",
+      "Pandas",
+      "Statistics",
+      "Git"
+    ],
+    "entry_expectation": "Has trained at least one ML model on a public dataset (Kaggle or similar)."
+  },
+  {
+    "role_id": "qa_testing",
+    "name": "QA / Test Engineer",
+    "branches": [
+      "CSE",
+      "IT"
+    ],
+    "description": "Designs test cases, automates testing, and ensures software quality.",
+    "required_skills": [
+      "Manual Testing",
+      "Python",
+      "Selenium",
+      "API Testing",
+      "Bug Tracking"
+    ],
+    "entry_expectation": "Understands SDLC/STLC and can write basic test cases and automation scripts."
+  },
+  {
+    "role_id": "devops",
+    "name": "DevOps / Cloud Support Engineer",
+    "branches": [
+      "CSE",
+      "IT",
+      "ECE"
+    ],
+    "description": "Manages CI/CD pipelines, cloud infrastructure, and deployment automation.",
+    "required_skills": [
+      "Linux",
+      "Git",
+      "Docker",
+      "CI/CD",
+      "Cloud Basics (AWS/Azure/GCP)",
+      "Shell Scripting"
+    ],
+    "entry_expectation": "Comfortable with Linux command line and has deployed at least one app to the cloud."
+  },
+  {
+    "role_id": "cybersecurity",
+    "name": "Cybersecurity Analyst",
+    "branches": [
+      "CSE",
+      "IT"
+    ],
+    "description": "Monitors, detects, and responds to security threats and vulnerabilities.",
+    "required_skills": [
+      "Networking Basics",
+      "Linux",
+      "Security Fundamentals",
+      "Python",
+      "Bug Tracking"
+    ],
+    "entry_expectation": "Understands basic networking and has completed a beginner security course/CTF."
+  },
+  {
+    "role_id": "embedded",
+    "name": "Embedded / Core Electronics Engineer",
+    "branches": [
+      "ECE",
+      "EE"
+    ],
+    "description": "Works on hardware-software interfacing, IoT devices, and embedded firmware.",
+    "required_skills": [
+      "C/C++",
+      "Microcontrollers",
+      "Circuit Design",
+      "IoT Protocols",
+      "Debugging Tools"
+    ],
+    "entry_expectation": "Has built at least one microcontroller-based project (Arduino/ESP32/similar)."
+  },
+  {
+    "role_id": "vlsi_design",
+    "name": "VLSI / Chip Design Engineer",
+    "branches": [
+      "ECE",
+      "EE"
+    ],
+    "description": "Designs and verifies integrated circuits and digital logic systems.",
+    "required_skills": [
+      "Verilog/VHDL",
+      "Digital Logic Design",
+      "Circuit Design",
+      "Debugging Tools"
+    ],
+    "entry_expectation": "Has completed a digital design lab project or simulation using Verilog/VHDL."
+  },
+  {
+    "role_id": "power_systems",
+    "name": "Power Systems / Electrical Engineer",
+    "branches": [
+      "EE",
+      "ECE"
+    ],
+    "description": "Works on power generation, distribution, and electrical systems design.",
+    "required_skills": [
+      "Circuit Design",
+      "MATLAB/Simulink",
+      "Power Systems Basics",
+      "AutoCAD Electrical"
+    ],
+    "entry_expectation": "Has completed a power systems lab project or simulation using MATLAB/Simulink."
+  },
+  {
+    "role_id": "robotics",
+    "name": "Robotics Engineer",
+    "branches": [
+      "ME",
+      "ECE",
+      "EE"
+    ],
+    "description": "Designs and builds robotic systems combining mechanical, electrical, and software elements.",
+    "required_skills": [
+      "C/C++",
+      "Microcontrollers",
+      "CAD Software",
+      "Circuit Design",
+      "Debugging Tools"
+    ],
+    "entry_expectation": "Has built at least one robotics/automation project combining hardware and code."
+  },
+  {
+    "role_id": "mech_design",
+    "name": "Mechanical Design / CAD Engineer",
+    "branches": [
+      "ME"
+    ],
+    "description": "Designs mechanical components and systems using CAD software and simulation tools.",
+    "required_skills": [
+      "CAD Software",
+      "SolidWorks/AutoCAD",
+      "Engineering Drawing",
+      "Material Science Basics"
+    ],
+    "entry_expectation": "Has completed at least one CAD design project (assembly or part modeling)."
+  },
+  {
+    "role_id": "manufacturing",
+    "name": "Manufacturing / Production Engineer",
+    "branches": [
+      "ME"
+    ],
+    "description": "Plans and optimizes manufacturing processes and production systems.",
+    "required_skills": [
+      "CAD Software",
+      "Process Planning",
+      "Quality Control Basics",
+      "Excel"
+    ],
+    "entry_expectation": "Understands basic manufacturing processes and has visited/interned at a production unit."
+  },
+  {
+    "role_id": "structural_eng",
+    "name": "Structural / Site Engineer",
+    "branches": [
+      "Civil"
+    ],
+    "description": "Assists in structural design, site supervision, and construction project execution.",
+    "required_skills": [
+      "AutoCAD",
+      "Structural Analysis Basics",
+      "Engineering Drawing",
+      "Excel"
+    ],
+    "entry_expectation": "Has completed a structural design coursework project or site visit report."
+  },
+  {
+    "role_id": "civil_planning",
+    "name": "Civil Planning / Estimation Engineer",
+    "branches": [
+      "Civil"
+    ],
+    "description": "Works on project planning, cost estimation, and quantity surveying for construction projects.",
+    "required_skills": [
+      "AutoCAD",
+      "Estimation & Costing",
+      "Excel",
+      "Project Planning Basics"
+    ],
+    "entry_expectation": "Has completed a basic estimation/costing exercise for a construction project."
+  }
+]
