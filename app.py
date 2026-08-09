@@ -514,8 +514,20 @@ def call_gemini(prompt, api_key, model=None, max_output_tokens=1024):
                 if use_thinking_config and ("thinking_config" in str(e).lower() or "thinking_budget" in str(e).lower()):
                     continue
                 break
-        if "404" not in str(last_error) and "NOT_FOUND" not in str(last_error) and "not found" not in str(last_error).lower():
-            break
+        if last_error:
+            error_str = str(last_error)
+            # Continue to the next candidate model not just on "model not found"
+            # errors, but also on quota exhaustion (429 / RESOURCE_EXHAUSTED) —
+            # each model has its own separate free-tier quota bucket, so a 429
+            # on gemini-3.5-flash doesn't mean gemini-2.5-flash-lite is also
+            # exhausted. Without this, the fallback chain never actually engages
+            # on quota errors, which defeats its purpose.
+            should_try_next = (
+                "404" in error_str or "NOT_FOUND" in error_str or "not found" in error_str.lower()
+                or "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "quota" in error_str.lower()
+            )
+            if not should_try_next:
+                break
     return False, f"Gemini call failed after trying {len(seen)} model(s). Last error: {last_error}"
 
 
@@ -632,24 +644,31 @@ SARVAM_SPEAKERS = [
 def sarvam_translate(text, target_lang_code, api_key, source_lang_code="en-IN", max_retries=2):
     """
     Uses the official sarvamai SDK rather than a hand-built REST call to
-    /translate. Explicit timeout + retry: the SDK's default read timeout is
-    too short (10s) for how long translate can genuinely take. Never raises —
-    returns (None, error_message) on any failure so the UI can fall back to
-    showing the untranslated English answer.
+    /translate. Explicitly uses sarvam-translate:v1 (2000-char limit) instead
+    of the default mayura:v1 (1000-char limit) — Gemini's answers routinely
+    exceed 1000 characters and were getting rejected with a 400. Text is also
+    defensively truncated as a backstop in case a future model/limit changes.
+    Never raises — returns (None, error_message) on any failure so the UI can
+    fall back to showing the untranslated English answer.
     """
     if not api_key:
         return None, "No Sarvam API key provided."
     if not SARVAM_SDK_AVAILABLE:
         return None, "sarvamai package is not installed (pip install sarvamai)."
 
+    SARVAM_TRANSLATE_MODEL = "sarvam-translate:v1"
+    MAX_TRANSLATE_CHARS = 1900  # safety margin under sarvam-translate:v1's 2000-char limit
+    safe_text = text if len(text) <= MAX_TRANSLATE_CHARS else text[:MAX_TRANSLATE_CHARS] + "…"
+
     last_error = None
     for attempt in range(max_retries + 1):
         try:
             client = SarvamSDKClient(api_subscription_key=api_key, timeout=30.0)
             response = client.text.translate(
-                input=text,
+                input=safe_text,
                 source_language_code=source_lang_code,
                 target_language_code=target_lang_code,
+                model=SARVAM_TRANSLATE_MODEL,
             )
             return response.translated_text, None
         except Exception as e:
