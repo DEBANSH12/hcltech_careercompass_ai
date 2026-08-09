@@ -392,24 +392,6 @@ INDIC_LANGUAGES = {
 
 GEMINI_MODEL_DEFAULT = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
 
-FUTURE_INTEGRATIONS = [
-    {"icon": "🏫", "name": "College Placement Systems",
-     "how": "Sync student profiles and readiness scores to a placement cell's existing system via a "
-            "mock REST endpoint — e.g. POST /students/{id}/readiness, so cohort data doesn't live only in this app."},
-    {"icon": "📚", "name": "LMS Platforms (Moodle / Google Classroom)",
-     "how": "Pull a student's enrolled courses and completed assignments to auto-detect skills, "
-            "reducing reliance on manual entry or resume parsing alone."},
-    {"icon": "💼", "name": "Job Portals",
-     "how": "Cross-reference live role postings against the roles.json skill taxonomy, so role "
-            "recommendations reflect current market demand rather than a static dataset only."},
-    {"icon": "🎓", "name": "Skilling Mission Systems",
-     "how": "Surface verified certification pathways (e.g. NSDC-aligned courses) directly inside the "
-            "Skill-Gap & Roadmap tab, alongside the free resources already listed."},
-    {"icon": "📊", "name": "Institutional Mentor Dashboards",
-     "how": "Export the Mentor Dashboard's aggregate skill-gap data as a scheduled feed (CSV/API) "
-            "into a college's own reporting tools, instead of a one-off in-session view."},
-]
-
 
 def init_state():
     defaults = {
@@ -707,19 +689,6 @@ def render_mentor_dashboard():
         st.dataframe(pd.DataFrame(st.session_state["feedback_log"]), use_container_width=True)
     else:
         st.caption("No student feedback logged yet this session.")
-
-    st.markdown("#### 🔗 Future Integration Touchpoints")
-    st.caption(
-        "Per the problem statement's integration/middleware guidance: actual portal integration is "
-        "not required for this prototype. These are the documented future connection points."
-    )
-    for item in FUTURE_INTEGRATIONS:
-        st.markdown(f"""
-        <div class="integration-card">
-            <b>{item['icon']} {item['name']}</b><br>
-            {item['how']}
-        </div>
-        """, unsafe_allow_html=True)
 
 
 if persona.startswith("📊"):
@@ -1063,20 +1032,6 @@ with tab5:
     </ul>
     </div>
     """, unsafe_allow_html=True)
-
-    st.markdown("### 🔗 Future Integration Touchpoints")
-    st.caption(
-        "Per the problem statement's integration/middleware guidance (section 12): actual portal "
-        "integration is not required for this prototype. These are the documented future connection "
-        "points — no live external calls are made from this app."
-    )
-    for item in FUTURE_INTEGRATIONS:
-        st.markdown(f"""
-        <div class="integration-card">
-            <b>{item['icon']} {item['name']}</b><br>
-            {item['how']}
-        </div>
-        """, unsafe_allow_html=True)
 
     st.markdown("### Feedback")
     with st.form("feedback_form"):
