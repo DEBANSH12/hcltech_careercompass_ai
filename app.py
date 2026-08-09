@@ -477,6 +477,31 @@ def init_state():
 init_state()
 
 
+def simplify_gemini_error(raw_error):
+    """
+    Converts a raw Gemini API error (often a large JSON blob with URLs, quota
+    metrics, and retry-delay details) into a short, human-readable message.
+    Never surfaces raw JSON/error dumps to the end user — this text can end up
+    visible in the UI, translated by Sarvam, and even read aloud via Bulbul, so
+    it must always be clean regardless of what Gemini's API actually returned.
+    """
+    if not raw_error:
+        return "Gemini is temporarily unavailable."
+    text = str(raw_error)
+    lower = text.lower()
+    if "resource_exhausted" in lower or "429" in text or "quota" in lower:
+        return "Gemini's free daily usage limit has been reached for now."
+    if "404" in text or "not_found" in lower or "not found" in lower:
+        return "Gemini's model configuration needs attention."
+    if "no gemini api key" in lower:
+        return "No Gemini API key is configured."
+    if "timeout" in lower or "timed out" in lower:
+        return "Gemini didn't respond in time."
+    if "permission" in lower or "403" in text or "invalid" in lower and "key" in lower:
+        return "Gemini couldn't authenticate this request."
+    return "Gemini is temporarily unavailable."
+
+
 def call_gemini(prompt, api_key, model=None, max_output_tokens=1024):
     if not api_key:
         return False, "No Gemini API key provided."
@@ -570,7 +595,7 @@ Do not add any text outside the JSON array. Do not promise placement, salary, or
 """
     ok, text = call_gemini(prompt, api_key)
     if not ok:
-        return fallback, False, text
+        return fallback, False, simplify_gemini_error(text)
     try:
         cleaned = text.strip().strip("```json").strip("```").strip()
         parsed = json.loads(cleaned)
@@ -628,7 +653,7 @@ Deepen remaining gap skills: {', '.join(missing[2:]) if len(missing) > 2 else 'p
 Revise core fundamentals, practice explaining your project out loud, and complete the
 Interview Readiness Checklist below.
 
-*(Gemini roadmap generation unavailable — showing a template roadmap instead: {text})*"""
+*(Gemini roadmap generation unavailable — {simplify_gemini_error(text)} Showing a template roadmap instead.)*"""
     return template, False
 
 
@@ -1062,9 +1087,10 @@ Answer helpfully in 3-5 sentences. Do not guarantee jobs, placements, salaries, 
         with st.spinner("Thinking..."):
             ok, answer = call_gemini(prompt, gemini_key, max_output_tokens=1024)
         if not ok:
-            answer = ("I can't reach Gemini right now, so here's general guidance: research the role's "
-                       "core skills, build one solid project, and ask your placement cell or a mentor for "
-                       "a second opinion. (" + answer + ")")
+            friendly_reason = simplify_gemini_error(answer)
+            answer = (f"I can't reach Gemini right now ({friendly_reason}). Here's general guidance: "
+                       "research the role's core skills, build one solid project, and ask your "
+                       "placement cell or a mentor for a second opinion.")
 
         st.session_state["chat_history"].append({"q": user_question, "a": answer})
 
