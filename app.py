@@ -39,6 +39,17 @@ try:
 except ImportError:
     GENAI_SDK_AVAILABLE = False
 
+# Sarvam's official SDK — used specifically for translation. The raw REST
+# call to /translate started returning 404s; Sarvam's own current docs show
+# the SDK as the primary integration path, and using it insulates this app
+# from internal endpoint changes the same way the Gemini model-fallback
+# chain already protects against Gemini's own model churn.
+try:
+    from sarvamai import SarvamAI as SarvamSDKClient
+    SARVAM_SDK_AVAILABLE = True
+except ImportError:
+    SARVAM_SDK_AVAILABLE = False
+
 
 st.set_page_config(
     page_title="CareerCompass AI",
@@ -300,7 +311,67 @@ DATA_SOURCE_STATUS = [
     ("profiles.json", profiles_are_external, len(PROFILES), "student profiles"),
 ]
 
+# =========================================================================
+# SKILL EQUIVALENCE MAP — fixes a real matching bug: skill labels defined as
+# compound/vendor-specific strings in one role (e.g. "SolidWorks/AutoCAD" in
+# Mechanical Design) don't exact-string-match a differently-worded label for
+# essentially the same skill in another role (e.g. plain "AutoCAD" in Civil
+# roles, or "AutoCAD Electrical" in Power Systems). Without this, a student
+# who has AutoCAD experience gets incorrectly marked as "missing" that skill
+# whenever the required-skill string in a given role happens to be phrased
+# differently. Each group below is a set of interchangeable skill labels —
+# having ANY one of them satisfies a requirement listed as ANY other in the
+# same group, in either direction.
+# =========================================================================
+SKILL_EQUIVALENCE_GROUPS = [
+    {"AutoCAD", "SolidWorks/AutoCAD", "AutoCAD Electrical"},
+]
 
+
+def _build_skill_equivalence_map(groups):
+    mapping = {}
+    for group in groups:
+        for skill in group:
+            mapping[skill] = group
+    return mapping
+
+
+SKILL_EQUIVALENCE_MAP = _build_skill_equivalence_map(SKILL_EQUIVALENCE_GROUPS)
+
+
+def skill_is_covered(required_skill, student_skills_set):
+    """
+    True if the student's skill set satisfies this required skill — either an
+    exact match, or any equivalent label from SKILL_EQUIVALENCE_MAP. This is
+    the single source of truth for skill matching; every place in the app that
+    compares a role's required skills against a student's skills should call
+    this instead of doing raw set intersection, so equivalent labels are never
+    silently missed.
+    """
+    if required_skill in student_skills_set:
+        return True
+    equivalents = SKILL_EQUIVALENCE_MAP.get(required_skill, {required_skill})
+    return bool(equivalents & student_skills_set)
+
+
+def compute_skill_gap(required_skills, student_skills):
+    """
+    Alias-aware replacement for plain set-difference skill matching.
+    Returns (have, missing, match_pct) where `have`/`missing` preserve the
+    original required-skill label strings (for consistent UI display) and
+    match_pct is computed against the true number of required skills, not an
+    inflated/deflated count from expanding aliases into extra set members.
+    """
+    student_skills_set = set(student_skills)
+    have = [s for s in required_skills if skill_is_covered(s, student_skills_set)]
+    missing = [s for s in required_skills if not skill_is_covered(s, student_skills_set)]
+    match_pct = round(100 * len(have) / max(len(required_skills), 1))
+    return sorted(have), sorted(missing), match_pct
+
+
+# =========================================================================
+# RESUME PARSING — PDF/DOCX text extraction + best-effort profile extraction
+# =========================================================================
 def extract_text_from_resume(uploaded_file):
     name = uploaded_file.name.lower()
     try:
@@ -449,13 +520,16 @@ def call_gemini(prompt, api_key, model=None, max_output_tokens=1024):
 
 
 def rule_based_role_match(profile):
-    student_skills = set(profile["skills"])
+    """
+    RAG / Intelligence fallback: deterministic skill-overlap retrieval + ranking,
+    using the alias-aware compute_skill_gap() so equivalent skill labels (e.g.
+    "AutoCAD" vs "SolidWorks/AutoCAD") are correctly credited either way.
+    """
+    student_skills = profile["skills"]
     scored = []
     for role in ROLES:
-        req = set(role["required_skills"])
-        overlap = student_skills & req
-        pct = round(100 * len(overlap) / max(len(req), 1))
-        scored.append({"role": role, "match_pct": pct, "have": sorted(overlap), "missing": sorted(req - student_skills)})
+        have, missing, pct = compute_skill_gap(role["required_skills"], student_skills)
+        scored.append({"role": role, "match_pct": pct, "have": have, "missing": missing})
     scored.sort(key=lambda x: x["match_pct"], reverse=True)
     return scored[:3]
 
@@ -494,11 +568,13 @@ Do not add any text outside the JSON array. Do not promise placement, salary, or
             role = role_lookup.get(item.get("role_id"))
             if not role:
                 continue
-            student_skills = set(profile["skills"])
-            req = set(role["required_skills"])
+            # Recompute have/missing with the alias-aware matcher rather than trusting
+            # Gemini's own skill bookkeeping — Gemini only supplies the ranking and the
+            # "why", the actual have/missing lists always come from our deterministic logic.
+            have, missing, _ = compute_skill_gap(role["required_skills"], profile["skills"])
             results.append({
                 "role": role, "match_pct": int(item.get("match_pct", 0)),
-                "have": sorted(student_skills & req), "missing": sorted(req - student_skills),
+                "have": have, "missing": missing,
                 "why": item.get("why", ""),
             })
         if results:
@@ -553,21 +629,37 @@ SARVAM_SPEAKERS = [
 ]
 
 
-def sarvam_translate(text, target_lang_code, api_key, source_lang_code="en-IN"):
+def sarvam_translate(text, target_lang_code, api_key, source_lang_code="en-IN", max_retries=2):
+    """
+    Uses the official sarvamai SDK rather than a hand-built REST call to
+    /translate. Explicit timeout + retry: the SDK's default read timeout is
+    too short (10s) for how long translate can genuinely take. Never raises —
+    returns (None, error_message) on any failure so the UI can fall back to
+    showing the untranslated English answer.
+    """
     if not api_key:
         return None, "No Sarvam API key provided."
-    try:
-        resp = requests.post(
-            f"{SARVAM_BASE}/translate",
-            headers={"api-subscription-key": api_key, "Content-Type": "application/json"},
-            json={"input": text, "source_language_code": source_lang_code, "target_language_code": target_lang_code},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data.get("translated_text"), None
-    except Exception as e:
-        return None, f"Sarvam translate failed: {e}"
+    if not SARVAM_SDK_AVAILABLE:
+        return None, "sarvamai package is not installed (pip install sarvamai)."
+
+    last_error = None
+    for attempt in range(max_retries + 1):
+        try:
+            client = SarvamSDKClient(api_subscription_key=api_key, timeout=30.0)
+            response = client.text.translate(
+                input=text,
+                source_language_code=source_lang_code,
+                target_language_code=target_lang_code,
+            )
+            return response.translated_text, None
+        except Exception as e:
+            last_error = f"Sarvam translate failed: {e}"
+            if "timeout" in str(e).lower() or "timed out" in str(e).lower():
+                if attempt < max_retries:
+                    time.sleep(1.5 * (attempt + 1))
+                    continue
+            break
+    return None, last_error
 
 
 def sarvam_tts(text, target_lang_code, api_key, speaker="anushka", max_retries=2):
@@ -672,7 +764,10 @@ def render_mentor_dashboard():
         role = next((r for r in ROLES if r["name"] == row["role_family"]), None)
         if not role:
             continue
-        missing = set(role["required_skills"]) - set(row["skills"])
+        # Alias-aware gap calc, same logic as the individual student view —
+        # avoids double-counting a skill as "missing" cohort-wide just because
+        # of a labeling mismatch rather than a genuine gap.
+        _, missing, _ = compute_skill_gap(role["required_skills"], row["skills"])
         for m in missing:
             gap_counter[m] = gap_counter.get(m, 0) + 1
     if gap_counter:
