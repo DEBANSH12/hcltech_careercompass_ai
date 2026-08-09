@@ -1,20 +1,6 @@
 """
 CareerCompass AI — Tier-2/3 Student Career Guidance Engine
 Problem Statement 4: AI Career Guidance Assistant for Tier-2/Tier-3 Engineering Students
-
-Five-layer architecture:
-  Data Layer          -> load_json_or_mock() + built-in MOCK_* datasets
-  RAG / Search Layer   -> retrieve_relevant_roles() (lightweight keyword/skill-overlap retrieval)
-  Intelligence Layer   -> call_gemini() driven role matching, skill-gap diff, roadmap generation
-  Application Layer    -> Streamlit tabs (Profile, Role Matcher, Roadmap, Indic Assistant, Responsible AI)
-  Responsible AI Layer -> disclaimer badges, source/scope cues, feedback log, mentor analytics
-
-NOTE ON APIs:
-  - Gemini: uses the current `google-genai` SDK (the older `google-generativeai` package
-    is fully deprecated/EOL as of 2026 and is intentionally NOT used here).
-  - Sarvam: called directly via `requests` against the public REST API (chat, translate, TTS).
-  - Both integrations degrade gracefully to clearly-labelled mock/rule-based logic if a key
-    is missing or a call fails — the app never crashes on a missing/invalid key.
 """
 
 import os
@@ -34,8 +20,6 @@ import requests
 from dotenv import load_dotenv
 load_dotenv()
 
-# Resume-parsing libraries are optional at import time — the app must still run
-# (with resume upload disabled and a clear message) if they aren't installed.
 try:
     from pypdf import PdfReader
     PDF_PARSING_AVAILABLE = True
@@ -48,7 +32,6 @@ try:
 except ImportError:
     DOCX_PARSING_AVAILABLE = False
 
-# Gemini SDK is optional at import time — the app must still run without it installed.
 try:
     from google import genai as google_genai
     from google.genai import types as google_genai_types
@@ -57,9 +40,6 @@ except ImportError:
     GENAI_SDK_AVAILABLE = False
 
 
-# =========================================================================
-# PAGE CONFIG + GLASSMORPHISM THEME
-# =========================================================================
 st.set_page_config(
     page_title="CareerCompass AI",
     page_icon="🧭",
@@ -67,739 +47,233 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-DARK_SLATE = "#0F172A"
-DEEP_NAVY = "#1E293B"
-ELECTRIC_CYAN = "#06B6D4"
-EMERALD = "#10B981"
-TEXT_MUTED = "#94A3B8"
+if "theme" not in st.session_state:
+    st.session_state["theme"] = "dark"
+
+THEMES = {
+    "dark": {
+        "bg": "#0F172A", "panel_bg": "#1E293B", "accent": "#06B6D4", "emerald": "#10B981",
+        "text_muted": "#94A3B8", "text_primary": "#FFFFFF", "text_body": "#E5E7EB",
+        "glass_card_bg": "rgba(30, 41, 59, 0.55)", "glass_card_border": "rgba(148, 163, 184, 0.18)",
+        "hero_grad": "linear-gradient(135deg, rgba(6,182,212,0.18) 0%, rgba(16,185,129,0.12) 100%)",
+        "hero_border": "rgba(6,182,212,0.35)", "metric_bg": "rgba(30, 41, 59, 0.6)",
+        "metric_border": "rgba(148, 163, 184, 0.15)", "tab_bg": "rgba(30, 41, 59, 0.5)",
+        "chart_paper": "#0F172A", "chart_plot": "#1E293B", "chart_font": "#E5E7EB",
+        "input_bg": "#1C2333", "border": "#2A3550",
+    },
+    "light": {
+        "bg": "#F8FAFC", "panel_bg": "#FFFFFF", "accent": "#0891B2", "emerald": "#059669",
+        "text_muted": "#64748B", "text_primary": "#0F172A", "text_body": "#1F2937",
+        "glass_card_bg": "rgba(255, 255, 255, 0.85)", "glass_card_border": "rgba(100, 116, 139, 0.25)",
+        "hero_grad": "linear-gradient(135deg, rgba(8,145,178,0.12) 0%, rgba(5,150,105,0.10) 100%)",
+        "hero_border": "rgba(8,145,178,0.35)", "metric_bg": "rgba(255, 255, 255, 0.9)",
+        "metric_border": "rgba(100, 116, 139, 0.2)", "tab_bg": "rgba(255, 255, 255, 0.7)",
+        "chart_paper": "#F8FAFC", "chart_plot": "#FFFFFF", "chart_font": "#1F2937",
+        "input_bg": "#F1F5F9", "border": "#D8DEEA",
+    },
+}
+
+T = THEMES[st.session_state["theme"]]
+DARK_SLATE = T["chart_paper"]
+DEEP_NAVY = T["chart_plot"]
+ELECTRIC_CYAN = T["accent"]
+EMERALD = T["emerald"]
+TEXT_MUTED = T["text_muted"]
 
 st.markdown(f"""
 <style>
-    .stApp {{ background-color: {DARK_SLATE}; }}
-
+    .stApp {{ background-color: {T['bg']}; }}
+    .stApp, .stApp p, .stApp span, .stApp label {{ color: {T['text_body']}; }}
+    div[data-testid="stMarkdownContainer"] p,
+    div[data-testid="stMarkdownContainer"] li,
+    label[data-testid="stWidgetLabel"] p,
+    div[data-testid="stCaptionContainer"] {{ color: {T['text_body']} !important; }}
+    h1, h2, h3, h4, h5 {{ color: {T['text_primary']} !important; }}
     .glass-card {{
-        background: rgba(30, 41, 59, 0.55);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        border-radius: 16px;
-        padding: 24px;
-        margin-bottom: 16px;
+        background: {T['glass_card_bg']}; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        border: 1px solid {T['glass_card_border']}; border-radius: 16px; padding: 24px; margin-bottom: 16px;
     }}
     .hero-banner {{
-        background: linear-gradient(135deg, rgba(6,182,212,0.18) 0%, rgba(16,185,129,0.12) 100%);
-        border: 1px solid rgba(6,182,212,0.35);
-        border-radius: 18px;
-        padding: 28px 32px;
-        margin-bottom: 20px;
+        background: {T['hero_grad']}; border: 1px solid {T['hero_border']};
+        border-radius: 18px; padding: 28px 32px; margin-bottom: 20px;
     }}
-    .hero-banner h1 {{ margin: 0; color: #FFFFFF; font-size: 30px; }}
-    .hero-banner p {{ color: {TEXT_MUTED}; margin-top: 6px; font-size: 14px; }}
-
+    .hero-banner h1 {{ margin: 0; color: {T['text_primary']}; font-size: 30px; }}
+    .hero-banner p {{ color: {T['text_muted']}; margin-top: 6px; font-size: 14px; }}
     .disclaimer-badge {{
-        display: inline-block;
-        background: rgba(245, 158, 11, 0.15);
-        border: 1px solid rgba(245, 158, 11, 0.5);
-        color: #FBBF24;
-        padding: 6px 14px;
-        border-radius: 999px;
-        font-size: 12.5px;
-        font-weight: 600;
-        margin-bottom: 10px;
+        display: inline-block; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.5);
+        color: #B45309; padding: 6px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 600; margin-bottom: 10px;
     }}
     .role-badge {{
-        display: inline-block;
-        background: rgba(6, 182, 212, 0.15);
-        border: 1px solid rgba(6, 182, 212, 0.4);
-        color: {ELECTRIC_CYAN};
-        padding: 4px 12px;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 600;
-        margin-right: 6px;
-        margin-bottom: 6px;
+        display: inline-block; background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.4);
+        color: {ELECTRIC_CYAN}; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;
+        margin-right: 6px; margin-bottom: 6px;
     }}
-    .skill-have {{ color: {EMERALD}; font-weight: 600; }}
-    .skill-partial {{ color: #FBBF24; font-weight: 600; }}
-    .skill-missing {{ color: #F87171; font-weight: 600; }}
-
+    .skill-have {{ color: #059669; font-weight: 600; }}
+    .skill-partial {{ color: #D97706; font-weight: 600; }}
+    .skill-missing {{ color: #DC2626; font-weight: 600; }}
+    .integration-card {{
+        background: {T['glass_card_bg']}; border: 1px solid {T['glass_card_border']};
+        border-radius: 12px; padding: 16px 20px; margin-bottom: 10px;
+    }}
+    .integration-card b {{ color: {T['text_primary']}; }}
     div[data-testid="stMetric"] {{
-        background: rgba(30, 41, 59, 0.6);
-        border: 1px solid rgba(148, 163, 184, 0.15);
-        border-radius: 12px;
-        padding: 12px 16px;
+        background: {T['metric_bg']}; border: 1px solid {T['metric_border']}; border-radius: 12px; padding: 12px 16px;
     }}
+    div[data-testid="stMetric"] label, div[data-testid="stMetric"] div {{ color: {T['text_body']} !important; }}
     .stTabs [data-baseweb="tab-list"] {{ gap: 4px; }}
-    .stTabs [data-baseweb="tab"] {{
-        background-color: rgba(30, 41, 59, 0.5);
-        border-radius: 8px 8px 0 0;
-        padding: 8px 18px;
+    .stTabs [data-baseweb="tab"] {{ background-color: {T['tab_bg']}; border-radius: 8px 8px 0 0; padding: 8px 18px; }}
+    .stTabs [data-baseweb="tab"] p {{ color: {T['text_body']} !important; }}
+    .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] > div {{
+        background-color: {T['input_bg']} !important; color: {T['text_body']} !important; border: 1px solid {T['border']} !important;
     }}
 </style>
 """, unsafe_allow_html=True)
 
+_spacer, _toggle_col = st.columns([6, 1])
+with _toggle_col:
+    is_light = st.toggle("☀️ Light", value=(st.session_state["theme"] == "light"), key="theme_toggle_widget")
+    new_theme = "light" if is_light else "dark"
+    if new_theme != st.session_state["theme"]:
+        st.session_state["theme"] = new_theme
+        st.rerun()
 
-# =========================================================================
-# DATA LAYER — external JSON with graceful fallback to built-in mock data
-# =========================================================================
+
 MOCK_ROLES = [
-    {
-        "role_id": "software_dev",
-        "name": "Software Development Engineer",
-        "branches": [
-            "CSE",
-            "IT"
-        ],
-        "description": "Builds and maintains applications, APIs, and backend/frontend systems.",
-        "required_skills": [
-            "Python",
-            "Data Structures & Algorithms",
-            "Git",
-            "REST APIs",
-            "SQL",
-            "OOP"
-        ],
-        "entry_expectation": "Comfortable writing clean code, basic DSA, at least one full project on GitHub."
-    },
-    {
-        "role_id": "frontend_dev",
-        "name": "Frontend Web Developer",
-        "branches": [
-            "CSE",
-            "IT"
-        ],
-        "description": "Builds user-facing web interfaces and interactive UI components.",
-        "required_skills": [
-            "HTML/CSS",
-            "JavaScript",
-            "React",
-            "Git",
-            "REST APIs",
-            "Responsive Design"
-        ],
-        "entry_expectation": "Has built and deployed at least one responsive multi-page website or web app."
-    },
-    {
-        "role_id": "backend_dev",
-        "name": "Backend Developer",
-        "branches": [
-            "CSE",
-            "IT"
-        ],
-        "description": "Designs and maintains server-side logic, databases, and APIs.",
-        "required_skills": [
-            "Python",
-            "SQL",
-            "REST APIs",
-            "Databases",
-            "Git",
-            "OOP"
-        ],
-        "entry_expectation": "Can design a basic database schema and build a working REST API."
-    },
-    {
-        "role_id": "data_analyst",
-        "name": "Data / ML Analyst",
-        "branches": [
-            "CSE",
-            "IT",
-            "EE"
-        ],
-        "description": "Works with data pipelines, dashboards, and applies ML models to business problems.",
-        "required_skills": [
-            "Python",
-            "SQL",
-            "Pandas",
-            "Statistics",
-            "Data Visualization",
-            "Excel"
-        ],
-        "entry_expectation": "Can clean and analyze a dataset end-to-end and present findings clearly."
-    },
-    {
-        "role_id": "ml_engineer",
-        "name": "AI / ML Engineer",
-        "branches": [
-            "CSE",
-            "IT",
-            "ECE"
-        ],
-        "description": "Builds and trains machine learning models and integrates them into applications.",
-        "required_skills": [
-            "Python",
-            "Machine Learning Basics",
-            "NumPy",
-            "Pandas",
-            "Statistics",
-            "Git"
-        ],
-        "entry_expectation": "Has trained at least one ML model on a public dataset (Kaggle or similar)."
-    },
-    {
-        "role_id": "qa_testing",
-        "name": "QA / Test Engineer",
-        "branches": [
-            "CSE",
-            "IT"
-        ],
-        "description": "Designs test cases, automates testing, and ensures software quality.",
-        "required_skills": [
-            "Manual Testing",
-            "Python",
-            "Selenium",
-            "API Testing",
-            "Bug Tracking"
-        ],
-        "entry_expectation": "Understands SDLC/STLC and can write basic test cases and automation scripts."
-    },
-    {
-        "role_id": "devops",
-        "name": "DevOps / Cloud Support Engineer",
-        "branches": [
-            "CSE",
-            "IT",
-            "ECE"
-        ],
-        "description": "Manages CI/CD pipelines, cloud infrastructure, and deployment automation.",
-        "required_skills": [
-            "Linux",
-            "Git",
-            "Docker",
-            "CI/CD",
-            "Cloud Basics (AWS/Azure/GCP)",
-            "Shell Scripting"
-        ],
-        "entry_expectation": "Comfortable with Linux command line and has deployed at least one app to the cloud."
-    },
-    {
-        "role_id": "cybersecurity",
-        "name": "Cybersecurity Analyst",
-        "branches": [
-            "CSE",
-            "IT"
-        ],
-        "description": "Monitors, detects, and responds to security threats and vulnerabilities.",
-        "required_skills": [
-            "Networking Basics",
-            "Linux",
-            "Security Fundamentals",
-            "Python",
-            "Bug Tracking"
-        ],
-        "entry_expectation": "Understands basic networking and has completed a beginner security course/CTF."
-    },
-    {
-        "role_id": "embedded",
-        "name": "Embedded / Core Electronics Engineer",
-        "branches": [
-            "ECE",
-            "EE"
-        ],
-        "description": "Works on hardware-software interfacing, IoT devices, and embedded firmware.",
-        "required_skills": [
-            "C/C++",
-            "Microcontrollers",
-            "Circuit Design",
-            "IoT Protocols",
-            "Debugging Tools"
-        ],
-        "entry_expectation": "Has built at least one microcontroller-based project (Arduino/ESP32/similar)."
-    },
-    {
-        "role_id": "vlsi_design",
-        "name": "VLSI / Chip Design Engineer",
-        "branches": [
-            "ECE",
-            "EE"
-        ],
-        "description": "Designs and verifies integrated circuits and digital logic systems.",
-        "required_skills": [
-            "Verilog/VHDL",
-            "Digital Logic Design",
-            "Circuit Design",
-            "Debugging Tools"
-        ],
-        "entry_expectation": "Has completed a digital design lab project or simulation using Verilog/VHDL."
-    },
-    {
-        "role_id": "power_systems",
-        "name": "Power Systems / Electrical Engineer",
-        "branches": [
-            "EE",
-            "ECE"
-        ],
-        "description": "Works on power generation, distribution, and electrical systems design.",
-        "required_skills": [
-            "Circuit Design",
-            "MATLAB/Simulink",
-            "Power Systems Basics",
-            "AutoCAD Electrical"
-        ],
-        "entry_expectation": "Has completed a power systems lab project or simulation using MATLAB/Simulink."
-    },
-    {
-        "role_id": "robotics",
-        "name": "Robotics Engineer",
-        "branches": [
-            "ME",
-            "ECE",
-            "EE"
-        ],
-        "description": "Designs and builds robotic systems combining mechanical, electrical, and software elements.",
-        "required_skills": [
-            "C/C++",
-            "Microcontrollers",
-            "CAD Software",
-            "Circuit Design",
-            "Debugging Tools"
-        ],
-        "entry_expectation": "Has built at least one robotics/automation project combining hardware and code."
-    },
-    {
-        "role_id": "mech_design",
-        "name": "Mechanical Design / CAD Engineer",
-        "branches": [
-            "ME"
-        ],
-        "description": "Designs mechanical components and systems using CAD software and simulation tools.",
-        "required_skills": [
-            "CAD Software",
-            "SolidWorks/AutoCAD",
-            "Engineering Drawing",
-            "Material Science Basics"
-        ],
-        "entry_expectation": "Has completed at least one CAD design project (assembly or part modeling)."
-    },
-    {
-        "role_id": "manufacturing",
-        "name": "Manufacturing / Production Engineer",
-        "branches": [
-            "ME"
-        ],
-        "description": "Plans and optimizes manufacturing processes and production systems.",
-        "required_skills": [
-            "CAD Software",
-            "Process Planning",
-            "Quality Control Basics",
-            "Excel"
-        ],
-        "entry_expectation": "Understands basic manufacturing processes and has visited/interned at a production unit."
-    },
-    {
-        "role_id": "structural_eng",
-        "name": "Structural / Site Engineer",
-        "branches": [
-            "Civil"
-        ],
-        "description": "Assists in structural design, site supervision, and construction project execution.",
-        "required_skills": [
-            "AutoCAD",
-            "Structural Analysis Basics",
-            "Engineering Drawing",
-            "Excel"
-        ],
-        "entry_expectation": "Has completed a structural design coursework project or site visit report."
-    },
-    {
-        "role_id": "civil_planning",
-        "name": "Civil Planning / Estimation Engineer",
-        "branches": [
-            "Civil"
-        ],
-        "description": "Works on project planning, cost estimation, and quantity surveying for construction projects.",
-        "required_skills": [
-            "AutoCAD",
-            "Estimation & Costing",
-            "Excel",
-            "Project Planning Basics"
-        ],
-        "entry_expectation": "Has completed a basic estimation/costing exercise for a construction project."
-    }
+    {"role_id": "software_dev", "name": "Software Development Engineer", "branches": ["CSE", "IT"],
+     "description": "Builds and maintains applications, APIs, and backend/frontend systems.",
+     "required_skills": ["Python", "Data Structures & Algorithms", "Git", "REST APIs", "SQL", "OOP"],
+     "entry_expectation": "Comfortable writing clean code, basic DSA, at least one full project on GitHub."},
+    {"role_id": "frontend_dev", "name": "Frontend Web Developer", "branches": ["CSE", "IT"],
+     "description": "Builds user-facing web interfaces and interactive UI components.",
+     "required_skills": ["HTML/CSS", "JavaScript", "React", "Git", "REST APIs", "Responsive Design"],
+     "entry_expectation": "Has built and deployed at least one responsive multi-page website or web app."},
+    {"role_id": "backend_dev", "name": "Backend Developer", "branches": ["CSE", "IT"],
+     "description": "Designs and maintains server-side logic, databases, and APIs.",
+     "required_skills": ["Python", "SQL", "REST APIs", "Databases", "Git", "OOP"],
+     "entry_expectation": "Can design a basic database schema and build a working REST API."},
+    {"role_id": "data_analyst", "name": "Data / ML Analyst", "branches": ["CSE", "IT", "EE"],
+     "description": "Works with data pipelines, dashboards, and applies ML models to business problems.",
+     "required_skills": ["Python", "SQL", "Pandas", "Statistics", "Data Visualization", "Excel"],
+     "entry_expectation": "Can clean and analyze a dataset end-to-end and present findings clearly."},
+    {"role_id": "ml_engineer", "name": "AI / ML Engineer", "branches": ["CSE", "IT", "ECE"],
+     "description": "Builds and trains machine learning models and integrates them into applications.",
+     "required_skills": ["Python", "Machine Learning Basics", "NumPy", "Pandas", "Statistics", "Git"],
+     "entry_expectation": "Has trained at least one ML model on a public dataset (Kaggle or similar)."},
+    {"role_id": "qa_testing", "name": "QA / Test Engineer", "branches": ["CSE", "IT"],
+     "description": "Designs test cases, automates testing, and ensures software quality.",
+     "required_skills": ["Manual Testing", "Python", "Selenium", "API Testing", "Bug Tracking"],
+     "entry_expectation": "Understands SDLC/STLC and can write basic test cases and automation scripts."},
+    {"role_id": "devops", "name": "DevOps / Cloud Support Engineer", "branches": ["CSE", "IT", "ECE"],
+     "description": "Manages CI/CD pipelines, cloud infrastructure, and deployment automation.",
+     "required_skills": ["Linux", "Git", "Docker", "CI/CD", "Cloud Basics (AWS/Azure/GCP)", "Shell Scripting"],
+     "entry_expectation": "Comfortable with Linux command line and has deployed at least one app to the cloud."},
+    {"role_id": "cybersecurity", "name": "Cybersecurity Analyst", "branches": ["CSE", "IT"],
+     "description": "Monitors, detects, and responds to security threats and vulnerabilities.",
+     "required_skills": ["Networking Basics", "Linux", "Security Fundamentals", "Python", "Bug Tracking"],
+     "entry_expectation": "Understands basic networking and has completed a beginner security course/CTF."},
+    {"role_id": "embedded", "name": "Embedded / Core Electronics Engineer", "branches": ["ECE", "EE"],
+     "description": "Works on hardware-software interfacing, IoT devices, and embedded firmware.",
+     "required_skills": ["C/C++", "Microcontrollers", "Circuit Design", "IoT Protocols", "Debugging Tools"],
+     "entry_expectation": "Has built at least one microcontroller-based project (Arduino/ESP32/similar)."},
+    {"role_id": "vlsi_design", "name": "VLSI / Chip Design Engineer", "branches": ["ECE", "EE"],
+     "description": "Designs and verifies integrated circuits and digital logic systems.",
+     "required_skills": ["Verilog/VHDL", "Digital Logic Design", "Circuit Design", "Debugging Tools"],
+     "entry_expectation": "Has completed a digital design lab project or simulation using Verilog/VHDL."},
+    {"role_id": "power_systems", "name": "Power Systems / Electrical Engineer", "branches": ["EE", "ECE"],
+     "description": "Works on power generation, distribution, and electrical systems design.",
+     "required_skills": ["Circuit Design", "MATLAB/Simulink", "Power Systems Basics", "AutoCAD Electrical"],
+     "entry_expectation": "Has completed a power systems lab project or simulation using MATLAB/Simulink."},
+    {"role_id": "robotics", "name": "Robotics Engineer", "branches": ["ME", "ECE", "EE"],
+     "description": "Designs and builds robotic systems combining mechanical, electrical, and software elements.",
+     "required_skills": ["C/C++", "Microcontrollers", "CAD Software", "Circuit Design", "Debugging Tools"],
+     "entry_expectation": "Has built at least one robotics/automation project combining hardware and code."},
+    {"role_id": "mech_design", "name": "Mechanical Design / CAD Engineer", "branches": ["ME"],
+     "description": "Designs mechanical components and systems using CAD software and simulation tools.",
+     "required_skills": ["CAD Software", "SolidWorks/AutoCAD", "Engineering Drawing", "Material Science Basics"],
+     "entry_expectation": "Has completed at least one CAD design project (assembly or part modeling)."},
+    {"role_id": "manufacturing", "name": "Manufacturing / Production Engineer", "branches": ["ME"],
+     "description": "Plans and optimizes manufacturing processes and production systems.",
+     "required_skills": ["CAD Software", "Process Planning", "Quality Control Basics", "Excel"],
+     "entry_expectation": "Understands basic manufacturing processes and has visited/interned at a production unit."},
+    {"role_id": "structural_eng", "name": "Structural / Site Engineer", "branches": ["Civil"],
+     "description": "Assists in structural design, site supervision, and construction project execution.",
+     "required_skills": ["AutoCAD", "Structural Analysis Basics", "Engineering Drawing", "Excel"],
+     "entry_expectation": "Has completed a structural design coursework project or site visit report."},
+    {"role_id": "civil_planning", "name": "Civil Planning / Estimation Engineer", "branches": ["Civil"],
+     "description": "Works on project planning, cost estimation, and quantity surveying for construction projects.",
+     "required_skills": ["AutoCAD", "Estimation & Costing", "Excel", "Project Planning Basics"],
+     "entry_expectation": "Has completed a basic estimation/costing exercise for a construction project."}
 ]
 
 MOCK_PROJECTS = [
-    {
-        "title": "Personal Portfolio Website",
-        "skill_tag": "Software Development Engineer",
-        "level": "Beginner"
-    },
-    {
-        "title": "Student Attendance Tracker (CLI + SQLite)",
-        "skill_tag": "Software Development Engineer",
-        "level": "Beginner"
-    },
-    {
-        "title": "Weather App with Public API",
-        "skill_tag": "Frontend Web Developer",
-        "level": "Beginner"
-    },
-    {
-        "title": "E-commerce UI Clone (React)",
-        "skill_tag": "Frontend Web Developer",
-        "level": "Intermediate"
-    },
-    {
-        "title": "Blog Platform REST API",
-        "skill_tag": "Backend Developer",
-        "level": "Beginner"
-    },
-    {
-        "title": "URL Shortener Service",
-        "skill_tag": "Backend Developer",
-        "level": "Intermediate"
-    },
-    {
-        "title": "Sales Data Dashboard (Pandas + Plotly)",
-        "skill_tag": "Data / ML Analyst",
-        "level": "Beginner"
-    },
-    {
-        "title": "Movie Recommendation System",
-        "skill_tag": "Data / ML Analyst",
-        "level": "Intermediate"
-    },
-    {
-        "title": "Handwritten Digit Classifier",
-        "skill_tag": "AI / ML Engineer",
-        "level": "Beginner"
-    },
-    {
-        "title": "Spam Email Detector",
-        "skill_tag": "AI / ML Engineer",
-        "level": "Intermediate"
-    },
-    {
-        "title": "Automated Login Test Suite (Selenium)",
-        "skill_tag": "QA / Test Engineer",
-        "level": "Beginner"
-    },
-    {
-        "title": "REST API Test Automation Framework",
-        "skill_tag": "QA / Test Engineer",
-        "level": "Intermediate"
-    },
-    {
-        "title": "Dockerized To-Do App with CI/CD",
-        "skill_tag": "DevOps / Cloud Support Engineer",
-        "level": "Intermediate"
-    },
-    {
-        "title": "Static Website Auto-Deploy Pipeline",
-        "skill_tag": "DevOps / Cloud Support Engineer",
-        "level": "Beginner"
-    },
-    {
-        "title": "Home Network Vulnerability Scan Report",
-        "skill_tag": "Cybersecurity Analyst",
-        "level": "Beginner"
-    },
-    {
-        "title": "Basic CTF Challenge Writeups",
-        "skill_tag": "Cybersecurity Analyst",
-        "level": "Intermediate"
-    },
-    {
-        "title": "Home Automation with ESP32",
-        "skill_tag": "Embedded / Core Electronics Engineer",
-        "level": "Beginner"
-    },
-    {
-        "title": "IoT Weather Station",
-        "skill_tag": "Embedded / Core Electronics Engineer",
-        "level": "Intermediate"
-    },
-    {
-        "title": "4-bit ALU Design in Verilog",
-        "skill_tag": "VLSI / Chip Design Engineer",
-        "level": "Beginner"
-    },
-    {
-        "title": "Traffic Light Controller (FPGA Sim)",
-        "skill_tag": "VLSI / Chip Design Engineer",
-        "level": "Intermediate"
-    },
-    {
-        "title": "Solar Panel Load Simulation (MATLAB)",
-        "skill_tag": "Power Systems / Electrical Engineer",
-        "level": "Beginner"
-    },
-    {
-        "title": "Line-Following Robot",
-        "skill_tag": "Robotics Engineer",
-        "level": "Beginner"
-    },
-    {
-        "title": "Robotic Arm Prototype (Arduino)",
-        "skill_tag": "Robotics Engineer",
-        "level": "Intermediate"
-    },
-    {
-        "title": "3D Printed Mechanical Assembly (CAD)",
-        "skill_tag": "Mechanical Design / CAD Engineer",
-        "level": "Beginner"
-    },
-    {
-        "title": "Small Bridge Model \u2014 Structural Analysis Report",
-        "skill_tag": "Structural / Site Engineer",
-        "level": "Beginner"
-    },
-    {
-        "title": "Building Material Cost Estimation Sheet",
-        "skill_tag": "Civil Planning / Estimation Engineer",
-        "level": "Beginner"
-    }
+    {"title": "Personal Portfolio Website", "skill_tag": "Software Development Engineer", "level": "Beginner"},
+    {"title": "Student Attendance Tracker (CLI + SQLite)", "skill_tag": "Software Development Engineer", "level": "Beginner"},
+    {"title": "Weather App with Public API", "skill_tag": "Frontend Web Developer", "level": "Beginner"},
+    {"title": "E-commerce UI Clone (React)", "skill_tag": "Frontend Web Developer", "level": "Intermediate"},
+    {"title": "Blog Platform REST API", "skill_tag": "Backend Developer", "level": "Beginner"},
+    {"title": "URL Shortener Service", "skill_tag": "Backend Developer", "level": "Intermediate"},
+    {"title": "Sales Data Dashboard (Pandas + Plotly)", "skill_tag": "Data / ML Analyst", "level": "Beginner"},
+    {"title": "Movie Recommendation System", "skill_tag": "Data / ML Analyst", "level": "Intermediate"},
+    {"title": "Handwritten Digit Classifier", "skill_tag": "AI / ML Engineer", "level": "Beginner"},
+    {"title": "Spam Email Detector", "skill_tag": "AI / ML Engineer", "level": "Intermediate"},
+    {"title": "Automated Login Test Suite (Selenium)", "skill_tag": "QA / Test Engineer", "level": "Beginner"},
+    {"title": "REST API Test Automation Framework", "skill_tag": "QA / Test Engineer", "level": "Intermediate"},
+    {"title": "Dockerized To-Do App with CI/CD", "skill_tag": "DevOps / Cloud Support Engineer", "level": "Intermediate"},
+    {"title": "Static Website Auto-Deploy Pipeline", "skill_tag": "DevOps / Cloud Support Engineer", "level": "Beginner"},
+    {"title": "Home Network Vulnerability Scan Report", "skill_tag": "Cybersecurity Analyst", "level": "Beginner"},
+    {"title": "Basic CTF Challenge Writeups", "skill_tag": "Cybersecurity Analyst", "level": "Intermediate"},
+    {"title": "Home Automation with ESP32", "skill_tag": "Embedded / Core Electronics Engineer", "level": "Beginner"},
+    {"title": "IoT Weather Station", "skill_tag": "Embedded / Core Electronics Engineer", "level": "Intermediate"},
+    {"title": "4-bit ALU Design in Verilog", "skill_tag": "VLSI / Chip Design Engineer", "level": "Beginner"},
+    {"title": "Traffic Light Controller (FPGA Sim)", "skill_tag": "VLSI / Chip Design Engineer", "level": "Intermediate"},
+    {"title": "Solar Panel Load Simulation (MATLAB)", "skill_tag": "Power Systems / Electrical Engineer", "level": "Beginner"},
+    {"title": "Line-Following Robot", "skill_tag": "Robotics Engineer", "level": "Beginner"},
+    {"title": "Robotic Arm Prototype (Arduino)", "skill_tag": "Robotics Engineer", "level": "Intermediate"},
+    {"title": "3D Printed Mechanical Assembly (CAD)", "skill_tag": "Mechanical Design / CAD Engineer", "level": "Beginner"},
+    {"title": "Small Bridge Model — Structural Analysis Report", "skill_tag": "Structural / Site Engineer", "level": "Beginner"},
+    {"title": "Building Material Cost Estimation Sheet", "skill_tag": "Civil Planning / Estimation Engineer", "level": "Beginner"}
 ]
 
 MOCK_RESOURCES = [
-    {
-        "resource": "CS50 (Harvard, free)",
-        "skill_tag": "Python",
-        "type": "Free"
-    },
-    {
-        "resource": "NPTEL Data Structures",
-        "skill_tag": "Data Structures & Algorithms",
-        "type": "Free"
-    },
-    {
-        "resource": "freeCodeCamp SQL Course",
-        "skill_tag": "SQL",
-        "type": "Free"
-    },
-    {
-        "resource": "freeCodeCamp Responsive Web Design",
-        "skill_tag": "HTML/CSS",
-        "type": "Free"
-    },
-    {
-        "resource": "React Official Tutorial",
-        "skill_tag": "React",
-        "type": "Free"
-    },
-    {
-        "resource": "Kaggle Micro-Courses",
-        "skill_tag": "Pandas",
-        "type": "Free"
-    },
-    {
-        "resource": "Google Machine Learning Crash Course",
-        "skill_tag": "Machine Learning Basics",
-        "type": "Free"
-    },
-    {
-        "resource": "Selenium with Python (docs)",
-        "skill_tag": "Selenium",
-        "type": "Free"
-    },
-    {
-        "resource": "Docker Official Get Started",
-        "skill_tag": "Docker",
-        "type": "Free"
-    },
-    {
-        "resource": "AWS Cloud Practitioner Essentials",
-        "skill_tag": "Cloud Basics (AWS/Azure/GCP)",
-        "type": "Free"
-    },
-    {
-        "resource": "TryHackMe Intro to Cybersecurity",
-        "skill_tag": "Security Fundamentals",
-        "type": "Free"
-    },
-    {
-        "resource": "Arduino Project Hub",
-        "skill_tag": "Microcontrollers",
-        "type": "Free"
-    },
-    {
-        "resource": "NPTEL Digital Circuits & Systems",
-        "skill_tag": "Digital Logic Design",
-        "type": "Free"
-    },
-    {
-        "resource": "NPTEL Power Systems",
-        "skill_tag": "Power Systems Basics",
-        "type": "Free"
-    },
-    {
-        "resource": "Autodesk AutoCAD Free Tutorials",
-        "skill_tag": "AutoCAD",
-        "type": "Free"
-    },
-    {
-        "resource": "NPTEL Structural Analysis",
-        "skill_tag": "Structural Analysis Basics",
-        "type": "Free"
-    },
-    {
-        "resource": "SolidWorks Student Tutorials",
-        "skill_tag": "SolidWorks/AutoCAD",
-        "type": "Free"
-    }
+    {"resource": "CS50 (Harvard, free)", "skill_tag": "Python", "type": "Free"},
+    {"resource": "NPTEL Data Structures", "skill_tag": "Data Structures & Algorithms", "type": "Free"},
+    {"resource": "freeCodeCamp SQL Course", "skill_tag": "SQL", "type": "Free"},
+    {"resource": "freeCodeCamp Responsive Web Design", "skill_tag": "HTML/CSS", "type": "Free"},
+    {"resource": "React Official Tutorial", "skill_tag": "React", "type": "Free"},
+    {"resource": "Kaggle Micro-Courses", "skill_tag": "Pandas", "type": "Free"},
+    {"resource": "Google Machine Learning Crash Course", "skill_tag": "Machine Learning Basics", "type": "Free"},
+    {"resource": "Selenium with Python (docs)", "skill_tag": "Selenium", "type": "Free"},
+    {"resource": "Docker Official Get Started", "skill_tag": "Docker", "type": "Free"},
+    {"resource": "AWS Cloud Practitioner Essentials", "skill_tag": "Cloud Basics (AWS/Azure/GCP)", "type": "Free"},
+    {"resource": "TryHackMe Intro to Cybersecurity", "skill_tag": "Security Fundamentals", "type": "Free"},
+    {"resource": "Arduino Project Hub", "skill_tag": "Microcontrollers", "type": "Free"},
+    {"resource": "NPTEL Digital Circuits & Systems", "skill_tag": "Digital Logic Design", "type": "Free"},
+    {"resource": "NPTEL Power Systems", "skill_tag": "Power Systems Basics", "type": "Free"},
+    {"resource": "Autodesk AutoCAD Free Tutorials", "skill_tag": "AutoCAD", "type": "Free"},
+    {"resource": "NPTEL Structural Analysis", "skill_tag": "Structural Analysis Basics", "type": "Free"},
+    {"resource": "SolidWorks Student Tutorials", "skill_tag": "SolidWorks/AutoCAD", "type": "Free"}
 ]
 
 MOCK_PROFILES = [
-    {
-        "id": "S1",
-        "branch": "CSE",
-        "year": 3,
-        "skills": [
-            "Python",
-            "Git",
-            "SQL"
-        ],
-        "role_family": "Software Development Engineer"
-    },
-    {
-        "id": "S2",
-        "branch": "ECE",
-        "year": 2,
-        "skills": [
-            "C/C++",
-            "Microcontrollers"
-        ],
-        "role_family": "Embedded / Core Electronics Engineer"
-    },
-    {
-        "id": "S3",
-        "branch": "CSE",
-        "year": 4,
-        "skills": [
-            "Python",
-            "Pandas",
-            "Statistics",
-            "SQL"
-        ],
-        "role_family": "Data / ML Analyst"
-    },
-    {
-        "id": "S4",
-        "branch": "IT",
-        "year": 3,
-        "skills": [
-            "Manual Testing",
-            "Python"
-        ],
-        "role_family": "QA / Test Engineer"
-    },
-    {
-        "id": "S5",
-        "branch": "CSE",
-        "year": 3,
-        "skills": [
-            "Linux",
-            "Git",
-            "Docker"
-        ],
-        "role_family": "DevOps / Cloud Support Engineer"
-    },
-    {
-        "id": "S6",
-        "branch": "IT",
-        "year": 3,
-        "skills": [
-            "HTML/CSS",
-            "JavaScript",
-            "Git"
-        ],
-        "role_family": "Frontend Web Developer"
-    },
-    {
-        "id": "S7",
-        "branch": "CSE",
-        "year": 4,
-        "skills": [
-            "Python",
-            "Machine Learning Basics",
-            "NumPy"
-        ],
-        "role_family": "AI / ML Engineer"
-    },
-    {
-        "id": "S8",
-        "branch": "CSE",
-        "year": 3,
-        "skills": [
-            "Networking Basics",
-            "Linux"
-        ],
-        "role_family": "Cybersecurity Analyst"
-    },
-    {
-        "id": "S9",
-        "branch": "ME",
-        "year": 3,
-        "skills": [
-            "CAD Software",
-            "Engineering Drawing"
-        ],
-        "role_family": "Mechanical Design / CAD Engineer"
-    },
-    {
-        "id": "S10",
-        "branch": "ME",
-        "year": 2,
-        "skills": [
-            "CAD Software"
-        ],
-        "role_family": "Robotics Engineer"
-    },
-    {
-        "id": "S11",
-        "branch": "Civil",
-        "year": 3,
-        "skills": [
-            "AutoCAD",
-            "Excel"
-        ],
-        "role_family": "Structural / Site Engineer"
-    },
-    {
-        "id": "S12",
-        "branch": "Civil",
-        "year": 4,
-        "skills": [
-            "AutoCAD",
-            "Estimation & Costing"
-        ],
-        "role_family": "Civil Planning / Estimation Engineer"
-    },
-    {
-        "id": "S13",
-        "branch": "EE",
-        "year": 3,
-        "skills": [
-            "Circuit Design",
-            "MATLAB/Simulink"
-        ],
-        "role_family": "Power Systems / Electrical Engineer"
-    },
-    {
-        "id": "S14",
-        "branch": "ECE",
-        "year": 4,
-        "skills": [
-            "Verilog/VHDL",
-            "Digital Logic Design"
-        ],
-        "role_family": "VLSI / Chip Design Engineer"
-    },
-    {
-        "id": "S15",
-        "branch": "IT",
-        "year": 2,
-        "skills": [
-            "Python",
-            "SQL"
-        ],
-        "role_family": "Backend Developer"
-    }
+    {"id": "S1", "branch": "CSE", "year": 3, "skills": ["Python", "Git", "SQL"], "role_family": "Software Development Engineer"},
+    {"id": "S2", "branch": "ECE", "year": 2, "skills": ["C/C++", "Microcontrollers"], "role_family": "Embedded / Core Electronics Engineer"},
+    {"id": "S3", "branch": "CSE", "year": 4, "skills": ["Python", "Pandas", "Statistics", "SQL"], "role_family": "Data / ML Analyst"},
+    {"id": "S4", "branch": "IT", "year": 3, "skills": ["Manual Testing", "Python"], "role_family": "QA / Test Engineer"},
+    {"id": "S5", "branch": "CSE", "year": 3, "skills": ["Linux", "Git", "Docker"], "role_family": "DevOps / Cloud Support Engineer"},
+    {"id": "S6", "branch": "IT", "year": 3, "skills": ["HTML/CSS", "JavaScript", "Git"], "role_family": "Frontend Web Developer"},
+    {"id": "S7", "branch": "CSE", "year": 4, "skills": ["Python", "Machine Learning Basics", "NumPy"], "role_family": "AI / ML Engineer"},
+    {"id": "S8", "branch": "CSE", "year": 3, "skills": ["Networking Basics", "Linux"], "role_family": "Cybersecurity Analyst"},
+    {"id": "S9", "branch": "ME", "year": 3, "skills": ["CAD Software", "Engineering Drawing"], "role_family": "Mechanical Design / CAD Engineer"},
+    {"id": "S10", "branch": "ME", "year": 2, "skills": ["CAD Software"], "role_family": "Robotics Engineer"},
+    {"id": "S11", "branch": "Civil", "year": 3, "skills": ["AutoCAD", "Excel"], "role_family": "Structural / Site Engineer"},
+    {"id": "S12", "branch": "Civil", "year": 4, "skills": ["AutoCAD", "Estimation & Costing"], "role_family": "Civil Planning / Estimation Engineer"},
+    {"id": "S13", "branch": "EE", "year": 3, "skills": ["Circuit Design", "MATLAB/Simulink"], "role_family": "Power Systems / Electrical Engineer"},
+    {"id": "S14", "branch": "ECE", "year": 4, "skills": ["Verilog/VHDL", "Digital Logic Design"], "role_family": "VLSI / Chip Design Engineer"},
+    {"id": "S15", "branch": "IT", "year": 2, "skills": ["Python", "SQL"], "role_family": "Backend Developer"}
 ]
 
 
-
 def load_json_or_mock(filename, mock_fallback):
-    """Data Layer: try to load an external JSON dataset; fall back to built-in mock data on any failure."""
     try:
         if os.path.exists(filename):
             with open(filename, "r", encoding="utf-8") as f:
@@ -826,11 +300,8 @@ DATA_SOURCE_STATUS = [
     ("profiles.json", profiles_are_external, len(PROFILES), "student profiles"),
 ]
 
-# =========================================================================
-# RESUME PARSING — PDF/DOCX text extraction + best-effort profile extraction
-# =========================================================================
+
 def extract_text_from_resume(uploaded_file):
-    """Returns (text, error). Supports .pdf and .docx only — never raises."""
     name = uploaded_file.name.lower()
     try:
         if name.endswith(".pdf"):
@@ -852,7 +323,6 @@ def extract_text_from_resume(uploaded_file):
 
 
 def guess_branch_from_text(text):
-    """Best-effort keyword match against the six supported branches."""
     text_lower = text.lower()
     branch_keywords = {
         "CSE": ["computer science", "cse", "computer engineering"],
@@ -869,16 +339,11 @@ def guess_branch_from_text(text):
 
 
 def guess_skills_from_text(text, skill_pool):
-    """
-    Best-effort keyword match using word-boundary regex, not raw substring search —
-    substring matching on short tokens (e.g. "C/C++" split into "c") produces near-universal
-    false positives, since the letter "c" appears in almost any text.
-    """
     text_lower = text.lower()
     found = []
     for skill in skill_pool:
         tokens = [skill.lower()] + [t.strip() for t in re.split(r"[\/&,]", skill.lower())]
-        tokens = [t for t in tokens if len(t) >= 2]  # drop single-character tokens entirely
+        tokens = [t for t in tokens if len(t) >= 2]
         for tok in tokens:
             pattern = r"\b" + re.escape(tok) + r"\b"
             if re.search(pattern, text_lower):
@@ -888,7 +353,6 @@ def guess_skills_from_text(text, skill_pool):
 
 
 def extract_projects_section(text):
-    """Best-effort: pull lines under a 'Projects' heading, or first few non-empty lines as fallback."""
     lines = [l.strip() for l in text.split("\n") if l.strip()]
     projects_idx = None
     for i, line in enumerate(lines):
@@ -906,16 +370,11 @@ def extract_projects_section(text):
 
 
 def parse_resume_to_profile(uploaded_file, skill_pool):
-    """
-    Full resume -> profile extraction pipeline. Always best-effort and never raises;
-    returns a dict the user is expected to review/edit before saving, not a final answer.
-    """
     text, err = extract_text_from_resume(uploaded_file)
     if err:
         return None, err
     if not text or len(text.strip()) < 20:
         return None, "Could not extract readable text from this file — try a different file or fill the form manually."
-
     return {
         "branch": guess_branch_from_text(text),
         "skills": guess_skills_from_text(text, skill_pool),
@@ -925,40 +384,37 @@ def parse_resume_to_profile(uploaded_file, skill_pool):
 
 
 INDIC_LANGUAGES = {
-    "English": "en-IN",
-    "Hindi (हिंदी)": "hi-IN",
-    "Hinglish": "hi-IN",
-    "Bengali (বাংলা)": "bn-IN",
-    "Gujarati (ગુજરાતી)": "gu-IN",
-    "Kannada (ಕನ್ನಡ)": "kn-IN",
-    "Malayalam (മലയാളം)": "ml-IN",
-    "Marathi (मराठी)": "mr-IN",
-    "Odia (ଓଡ଼ିଆ)": "od-IN",
-    "Punjabi (ਪੰਜਾਬੀ)": "pa-IN",
-    "Tamil (தமிழ்)": "ta-IN",
-    "Telugu (తెలుగు)": "te-IN",
+    "English": "en-IN", "Hindi (हिंदी)": "hi-IN", "Hinglish": "hi-IN", "Bengali (বাংলা)": "bn-IN",
+    "Gujarati (ગુજરાતી)": "gu-IN", "Kannada (ಕನ್ನಡ)": "kn-IN", "Malayalam (മലയാളം)": "ml-IN",
+    "Marathi (मराठी)": "mr-IN", "Odia (ଓଡ଼ିଆ)": "od-IN", "Punjabi (ਪੰਜਾਬੀ)": "pa-IN",
+    "Tamil (தமிழ்)": "ta-IN", "Telugu (తెలుగు)": "te-IN",
 }
 
-# Gemini model — kept as a single named constant (not scattered/hardcoded) because
-# Google has been retiring model IDs aggressively through 2026. If this ever gets
-# blocked again, change GEMINI_MODEL_DEFAULT here (or override live via the
-# Advanced Settings expander in the sidebar) without touching any other code.
 GEMINI_MODEL_DEFAULT = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
 
+FUTURE_INTEGRATIONS = [
+    {"icon": "🏫", "name": "College Placement Systems",
+     "how": "Sync student profiles and readiness scores to a placement cell's existing system via a "
+            "mock REST endpoint — e.g. POST /students/{id}/readiness, so cohort data doesn't live only in this app."},
+    {"icon": "📚", "name": "LMS Platforms (Moodle / Google Classroom)",
+     "how": "Pull a student's enrolled courses and completed assignments to auto-detect skills, "
+            "reducing reliance on manual entry or resume parsing alone."},
+    {"icon": "💼", "name": "Job Portals",
+     "how": "Cross-reference live role postings against the roles.json skill taxonomy, so role "
+            "recommendations reflect current market demand rather than a static dataset only."},
+    {"icon": "🎓", "name": "Skilling Mission Systems",
+     "how": "Surface verified certification pathways (e.g. NSDC-aligned courses) directly inside the "
+            "Skill-Gap & Roadmap tab, alongside the free resources already listed."},
+    {"icon": "📊", "name": "Institutional Mentor Dashboards",
+     "how": "Export the Mentor Dashboard's aggregate skill-gap data as a scheduled feed (CSV/API) "
+            "into a college's own reporting tools, instead of a one-off in-session view."},
+]
 
-# =========================================================================
-# SESSION STATE INIT
-# =========================================================================
+
 def init_state():
     defaults = {
-        "profile": None,
-        "top_matches": None,
-        "roadmap_text": None,
-        "checklist": {},
-        "feedback_log": [],
-        "chat_history": [],
-        "gemini_model_override": "",
-        "resume_extracted": None,
+        "profile": None, "top_matches": None, "roadmap_text": None, "checklist": {},
+        "feedback_log": [], "chat_history": [], "gemini_model_override": "", "resume_extracted": None,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -968,18 +424,7 @@ def init_state():
 init_state()
 
 
-# =========================================================================
-# INTELLIGENCE LAYER — Gemini (google-genai) with rule-based fallback
-# =========================================================================
 def call_gemini(prompt, api_key, model=None, max_output_tokens=1024):
-    """
-    Returns (success: bool, text: str).
-    Never raises — any failure (missing key, missing SDK, network/API error)
-    returns success=False with a human-readable reason so the UI can fall back cleanly.
-
-    Tries a short chain of current model IDs automatically: Google has retired multiple
-    Gemini model IDs mid-year through 2026, so a single hardcoded name is fragile.
-    """
     if not api_key:
         return False, "No Gemini API key provided."
     if not GENAI_SDK_AVAILABLE:
@@ -995,17 +440,13 @@ def call_gemini(prompt, api_key, model=None, max_output_tokens=1024):
         if not candidate or candidate in seen:
             continue
         seen.add(candidate)
-        # Try with thinking disabled first (faster, keeps the full token budget for the
-        # visible answer instead of internal reasoning). If the model rejects that config
-        # field, retry once without it before moving to the next candidate model.
         for use_thinking_config in (True, False):
             try:
                 config_kwargs = dict(max_output_tokens=max_output_tokens, temperature=0.4)
                 if use_thinking_config:
                     config_kwargs["thinking_config"] = google_genai_types.ThinkingConfig(thinking_budget=0)
                 response = client.models.generate_content(
-                    model=candidate,
-                    contents=prompt,
+                    model=candidate, contents=prompt,
                     config=google_genai_types.GenerateContentConfig(**config_kwargs),
                 )
                 text = getattr(response, "text", None)
@@ -1018,42 +459,27 @@ def call_gemini(prompt, api_key, model=None, max_output_tokens=1024):
             except Exception as e:
                 last_error = f"{candidate} failed: {e}"
                 if use_thinking_config and ("thinking_config" in str(e).lower() or "thinking_budget" in str(e).lower()):
-                    continue  # retry same model without thinking_config
-                break  # this model truly failed; move to next candidate
+                    continue
+                break
         if "404" not in str(last_error) and "NOT_FOUND" not in str(last_error) and "not found" not in str(last_error).lower():
             break
     return False, f"Gemini call failed after trying {len(seen)} model(s). Last error: {last_error}"
 
 
 def rule_based_role_match(profile):
-    """
-    RAG / Intelligence fallback: simple, deterministic skill-overlap retrieval + ranking.
-    Used when no Gemini key is present, or the Gemini call fails, so the demo never breaks.
-    """
     student_skills = set(profile["skills"])
     scored = []
     for role in ROLES:
         req = set(role["required_skills"])
         overlap = student_skills & req
         pct = round(100 * len(overlap) / max(len(req), 1))
-        scored.append({
-            "role": role,
-            "match_pct": pct,
-            "have": sorted(overlap),
-            "missing": sorted(req - student_skills),
-        })
+        scored.append({"role": role, "match_pct": pct, "have": sorted(overlap), "missing": sorted(req - student_skills)})
     scored.sort(key=lambda x: x["match_pct"], reverse=True)
     return scored[:3]
 
 
 def gemini_role_match(profile, api_key):
-    """
-    Intelligence Layer: ask Gemini to rank roles and explain fit, grounded in the
-    prepared ROLES dataset (RAG-style grounding — Gemini only sees the roles we pass it).
-    Falls back to rule_based_role_match() on any failure.
-    """
     fallback = rule_based_role_match(profile)
-
     roles_context = json.dumps(ROLES, indent=2)
     prompt = f"""You are a career guidance assistant for a Tier-2/Tier-3 engineering student in India.
 Use ONLY the role data below — do not invent roles or skills that aren't listed.
@@ -1077,7 +503,6 @@ Do not add any text outside the JSON array. Do not promise placement, salary, or
     ok, text = call_gemini(prompt, api_key)
     if not ok:
         return fallback, False, text
-
     try:
         cleaned = text.strip().strip("```json").strip("```").strip()
         parsed = json.loads(cleaned)
@@ -1090,10 +515,8 @@ Do not add any text outside the JSON array. Do not promise placement, salary, or
             student_skills = set(profile["skills"])
             req = set(role["required_skills"])
             results.append({
-                "role": role,
-                "match_pct": int(item.get("match_pct", 0)),
-                "have": sorted(student_skills & req),
-                "missing": sorted(req - student_skills),
+                "role": role, "match_pct": int(item.get("match_pct", 0)),
+                "have": sorted(student_skills & req), "missing": sorted(req - student_skills),
                 "why": item.get("why", ""),
             })
         if results:
@@ -1104,7 +527,6 @@ Do not add any text outside the JSON array. Do not promise placement, salary, or
 
 
 def gemini_roadmap(profile, top_role, api_key):
-    """Intelligence Layer: 30/60/90-day roadmap. Falls back to a template roadmap on failure."""
     missing = top_role["missing"]
     prompt = f"""Create a realistic 30/60/90-day learning roadmap for a Tier-2/Tier-3 engineering
 student in India targeting the role: {top_role['role']['name']}.
@@ -1140,13 +562,7 @@ Interview Readiness Checklist below.
     return template, False
 
 
-# =========================================================================
-# SARVAM AI — Indic AI Enablement (real REST calls, no SDK)
-# =========================================================================
 SARVAM_BASE = "https://api.sarvam.ai"
-
-# Confirmed valid speaker list from Sarvam's own API error response — avoids guessing
-# a name that doesn't exist (the earlier "meera" bug was exactly this).
 SARVAM_SPEAKERS = [
     "anushka", "abhilash", "manisha", "vidya", "arya", "karun", "hitesh", "aditya",
     "ritu", "priya", "neha", "rahul", "pooja", "rohan", "simran", "kavya", "amit",
@@ -1162,11 +578,7 @@ def sarvam_translate(text, target_lang_code, api_key, source_lang_code="en-IN"):
         resp = requests.post(
             f"{SARVAM_BASE}/translate",
             headers={"api-subscription-key": api_key, "Content-Type": "application/json"},
-            json={
-                "input": text,
-                "source_language_code": source_lang_code,
-                "target_language_code": target_lang_code,
-            },
+            json={"input": text, "source_language_code": source_lang_code, "target_language_code": target_lang_code},
             timeout=10,
         )
         resp.raise_for_status()
@@ -1177,7 +589,6 @@ def sarvam_translate(text, target_lang_code, api_key, source_lang_code="en-IN"):
 
 
 def sarvam_tts(text, target_lang_code, api_key, speaker="anushka", max_retries=2):
-    """Bulbul TTS. Returns (audio_bytes, error). Retries on timeout before giving up."""
     if not api_key:
         return None, "No Sarvam API key provided."
     last_error = None
@@ -1186,12 +597,7 @@ def sarvam_tts(text, target_lang_code, api_key, speaker="anushka", max_retries=2
             resp = requests.post(
                 f"{SARVAM_BASE}/text-to-speech",
                 headers={"api-subscription-key": api_key, "Content-Type": "application/json"},
-                json={
-                    "text": text[:1500],
-                    "target_language_code": target_lang_code,
-                    "speaker": speaker,
-                    "model": "bulbul:v2",
-                },
+                json={"text": text[:1500], "target_language_code": target_lang_code, "speaker": speaker, "model": "bulbul:v2"},
                 timeout=35,
             )
             resp.raise_for_status()
@@ -1213,17 +619,13 @@ def sarvam_tts(text, target_lang_code, api_key, speaker="anushka", max_retries=2
 
 
 def sarvam_stt(uploaded_file, api_key):
-    """Saaras STT — accepts an uploaded audio file object. Returns (transcript, error)."""
     if not api_key:
         return None, "No Sarvam API key provided."
     try:
         files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type or "audio/wav")}
         resp = requests.post(
             f"{SARVAM_BASE}/speech-to-text",
-            headers={"api-subscription-key": api_key},
-            data={"model": "saaras:v3"},
-            files=files,
-            timeout=30,
+            headers={"api-subscription-key": api_key}, data={"model": "saaras:v3"}, files=files, timeout=30,
         )
         resp.raise_for_status()
         data = resp.json()
@@ -1232,9 +634,6 @@ def sarvam_stt(uploaded_file, api_key):
         return None, f"Sarvam STT failed: {e}"
 
 
-# =========================================================================
-# SIDEBAR — branding, API keys, persona, language, disclaimer
-# =========================================================================
 with st.sidebar:
     st.markdown("## 🧭 CareerCompass AI")
     st.caption("Tier-2/3 Engineering Career Guidance Engine")
@@ -1259,9 +658,6 @@ with st.sidebar:
     )
 
 
-# =========================================================================
-# HERO BANNER
-# =========================================================================
 st.markdown("""
 <div class="hero-banner">
     <h1>🧭 CareerCompass AI</h1>
@@ -1271,9 +667,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# =========================================================================
-# MENTOR DASHBOARD (persona switch)
-# =========================================================================
 def render_mentor_dashboard():
     st.subheader("📊 Placement Cell / Mentor Analytics")
     df = pd.DataFrame(PROFILES)
@@ -1288,7 +681,7 @@ def render_mentor_dashboard():
     role_counts.columns = ["role_family", "count"]
     fig = px.bar(role_counts, x="role_family", y="count", color="role_family",
                  color_discrete_sequence=px.colors.qualitative.Set2)
-    fig.update_layout(plot_bgcolor=DEEP_NAVY, paper_bgcolor=DARK_SLATE, font_color="#E5E7EB", showlegend=False)
+    fig.update_layout(plot_bgcolor=DEEP_NAVY, paper_bgcolor=DARK_SLATE, font_color=T["chart_font"], showlegend=False)
     st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("#### Most common skill gaps (vs. their nearest role family)")
@@ -1304,7 +697,7 @@ def render_mentor_dashboard():
         gap_df = pd.DataFrame(sorted(gap_counter.items(), key=lambda x: -x[1]), columns=["skill", "students_missing"])
         fig2 = px.bar(gap_df.head(10), x="students_missing", y="skill", orientation="h",
                       color="students_missing", color_continuous_scale="Tealgrn")
-        fig2.update_layout(plot_bgcolor=DEEP_NAVY, paper_bgcolor=DARK_SLATE, font_color="#E5E7EB")
+        fig2.update_layout(plot_bgcolor=DEEP_NAVY, paper_bgcolor=DARK_SLATE, font_color=T["chart_font"])
         st.plotly_chart(fig2, use_container_width=True)
     else:
         st.caption("No skill gap data available.")
@@ -1315,24 +708,30 @@ def render_mentor_dashboard():
     else:
         st.caption("No student feedback logged yet this session.")
 
+    st.markdown("#### 🔗 Future Integration Touchpoints")
+    st.caption(
+        "Per the problem statement's integration/middleware guidance: actual portal integration is "
+        "not required for this prototype. These are the documented future connection points."
+    )
+    for item in FUTURE_INTEGRATIONS:
+        st.markdown(f"""
+        <div class="integration-card">
+            <b>{item['icon']} {item['name']}</b><br>
+            {item['how']}
+        </div>
+        """, unsafe_allow_html=True)
+
 
 if persona.startswith("📊"):
     render_mentor_dashboard()
     st.stop()
 
 
-# =========================================================================
-# STUDENT MODE — TABS
-# =========================================================================
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "1️⃣ Profile & Skills",
-    "2️⃣ Role Matcher",
-    "3️⃣ Skill-Gap & Roadmap",
-    "4️⃣ Indic Assistant",
-    "5️⃣ Responsible AI & Feedback",
+    "1️⃣ Profile & Skills", "2️⃣ Role Matcher", "3️⃣ Skill-Gap & Roadmap",
+    "4️⃣ Indic Assistant", "5️⃣ Responsible AI & Feedback",
 ])
 
-# ---------------------------- TAB 1: PROFILE ----------------------------
 with tab1:
     st.markdown("### Student Profile & Skill Capture")
     st.caption(
@@ -1374,27 +773,23 @@ with tab1:
             branch = st.selectbox("Branch", ALL_BRANCHES,
                                    index=ALL_BRANCHES.index(default_branch) if default_branch in ALL_BRANCHES else 0)
             year = st.selectbox("Academic Year", [1, 2, 3, 4])
-            interest = st.selectbox(
-                "Preferred role family (or 'Not sure yet')",
-                ["Not sure yet"] + [r["name"] for r in ROLES],
-            )
+            interest = st.selectbox("Preferred role family (or 'Not sure yet')",
+                                     ["Not sure yet"] + [r["name"] for r in ROLES])
         with c2:
             skills = st.multiselect("Current technical skills", ALL_SKILLS, default=default_skills)
             weekly_hours = st.slider("Weekly available learning hours", 2, 30, 8)
-            projects = st.text_area("Completed projects (brief, one per line)", height=90,
-                                     value=default_projects_text)
+            projects = st.text_area("Completed projects (brief, one per line)", height=90, value=default_projects_text)
 
         submitted = st.form_submit_button("Save Profile", type="primary")
 
     if submitted:
         st.session_state["profile"] = {
-            "branch": branch, "year": year, "interest": interest,
-            "skills": skills, "weekly_hours": weekly_hours,
-            "projects": [p.strip() for p in projects.split("\n") if p.strip()],
+            "branch": branch, "year": year, "interest": interest, "skills": skills,
+            "weekly_hours": weekly_hours, "projects": [p.strip() for p in projects.split("\n") if p.strip()],
         }
         st.session_state["top_matches"] = None
         st.session_state["roadmap_text"] = None
-        st.session_state["resume_extracted"] = None  # clear so a stale resume doesn't re-fill next time
+        st.session_state["resume_extracted"] = None
         st.success("Profile saved. Head to Tab 2 for role matching.")
 
     profile = st.session_state["profile"]
@@ -1413,20 +808,17 @@ with tab1:
                                            line_color=ELECTRIC_CYAN, fillcolor="rgba(6,182,212,0.25)"))
             fig.update_layout(
                 polar=dict(bgcolor=DEEP_NAVY, radialaxis=dict(visible=True, range=[0, 100])),
-                paper_bgcolor=DARK_SLATE, font_color="#E5E7EB", showlegend=False, height=380,
+                paper_bgcolor=DARK_SLATE, font_color=T["chart_font"], showlegend=False, height=380,
             )
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.caption("Add skills above to see your skill radar chart.")
 
-# ---------------------------- TAB 2: ROLE MATCHER ----------------------------
 with tab2:
     st.markdown("### AI Role Matcher & Career Guidance")
 
     with st.expander("📄 Or upload a resume here to auto-fill your profile and match immediately"):
-        resume_upload_tab2 = st.file_uploader(
-            "Upload resume (PDF or DOCX)", type=["pdf", "docx"], key="resume_upload_tab2",
-        )
+        resume_upload_tab2 = st.file_uploader("Upload resume (PDF or DOCX)", type=["pdf", "docx"], key="resume_upload_tab2")
         if resume_upload_tab2 is not None:
             if st.button("✨ Parse Resume, Fill Profile & Find Matches", key="parse_resume_tab2", type="primary"):
                 with st.spinner("Reading resume and matching..."):
@@ -1435,11 +827,8 @@ with tab2:
                         st.error(f"Couldn't parse resume: {parse_err}")
                     else:
                         quick_profile = {
-                            "branch": extracted["branch"] or ALL_BRANCHES[0],
-                            "year": 3,  # sensible default; user can refine in Tab 1 afterward
-                            "interest": "Not sure yet",
-                            "skills": extracted["skills"],
-                            "weekly_hours": 8,
+                            "branch": extracted["branch"] or ALL_BRANCHES[0], "year": 3,
+                            "interest": "Not sure yet", "skills": extracted["skills"], "weekly_hours": 8,
                             "projects": [l for l in extracted["projects_text"].split("\n") if l.strip()],
                         }
                         st.session_state["profile"] = quick_profile
@@ -1447,9 +836,8 @@ with tab2:
                         matches, used_gemini, note = gemini_role_match(quick_profile, gemini_key)
                         st.session_state["top_matches"] = matches
                         st.session_state["match_source_note"] = (
-                            "✅ Ranked by Gemini, grounded in the prepared role dataset."
-                            if used_gemini else
-                            f"ℹ️ Rule-based skill-overlap ranking used. {note or ''}"
+                            "✅ Ranked by Gemini, grounded in the prepared role dataset." if used_gemini
+                            else f"ℹ️ Rule-based skill-overlap ranking used. {note or ''}"
                         )
                         st.success(
                             f"Profile auto-filled from resume ({len(extracted['skills'])} skills detected) "
@@ -1465,9 +853,8 @@ with tab2:
                 matches, used_gemini, note = gemini_role_match(profile, gemini_key)
                 st.session_state["top_matches"] = matches
                 st.session_state["match_source_note"] = (
-                    "✅ Ranked by Gemini, grounded in the prepared role dataset."
-                    if used_gemini else
-                    f"ℹ️ Rule-based skill-overlap ranking used. {note or ''}"
+                    "✅ Ranked by Gemini, grounded in the prepared role dataset." if used_gemini
+                    else f"ℹ️ Rule-based skill-overlap ranking used. {note or ''}"
                 )
 
         matches = st.session_state.get("top_matches")
@@ -1501,7 +888,6 @@ with tab2:
         else:
             st.info("Click the button above to generate your role matches.")
 
-# ---------------------------- TAB 3: ROADMAP ----------------------------
 with tab3:
     st.markdown("### Skill-Gap Analyzer & 30/60/90-Day Roadmap")
     profile = st.session_state["profile"]
@@ -1527,16 +913,13 @@ with tab3:
         with gc3:
             readiness = round(100 * len(top["have"]) / max(len(top["have"]) + len(top["missing"]), 1))
             fig = go.Figure(go.Indicator(
-                mode="gauge+number", value=readiness,
-                title={"text": "Readiness Score"},
-                gauge={"axis": {"range": [0, 100]},
-                       "bar": {"color": ELECTRIC_CYAN},
-                       "bgcolor": DEEP_NAVY,
+                mode="gauge+number", value=readiness, title={"text": "Readiness Score"},
+                gauge={"axis": {"range": [0, 100]}, "bar": {"color": ELECTRIC_CYAN}, "bgcolor": DEEP_NAVY,
                        "steps": [{"range": [0, 40], "color": "rgba(248,113,113,0.3)"},
                                  {"range": [40, 70], "color": "rgba(251,191,36,0.3)"},
                                  {"range": [70, 100], "color": "rgba(16,185,129,0.3)"}]},
             ))
-            fig.update_layout(paper_bgcolor=DARK_SLATE, font_color="#E5E7EB", height=250,
+            fig.update_layout(paper_bgcolor=DARK_SLATE, font_color=T["chart_font"], height=250,
                                margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig, use_container_width=True)
 
@@ -1568,13 +951,11 @@ with tab3:
         st.progress(done / len(checklist_items))
         st.caption(f"{done}/{len(checklist_items)} completed")
 
-# ---------------------------- TAB 4: INDIC ASSISTANT ----------------------------
 with tab4:
     st.markdown("### Sarvam Indic AI — Multilingual Career Q&A")
     st.caption(f"Selected language: {selected_lang_label}")
 
-    user_question = st.text_input("Ask a career or skilling question:",
-                                   placeholder="e.g. Should I learn Java or Python first?")
+    user_question = st.text_input("Ask a career or skilling question:", placeholder="e.g. Should I learn Java or Python first?")
 
     audio_upload = st.file_uploader("Or upload a short voice question (Saaras STT)", type=["wav", "mp3", "m4a"])
     if audio_upload and sarvam_key:
@@ -1590,7 +971,6 @@ with tab4:
     if st.button("💬 Get Answer", type="primary") and user_question:
         profile = st.session_state["profile"]
         context = f"Student branch: {profile['branch']}, year: {profile['year']}, skills: {', '.join(profile['skills'])}." if profile else "No profile on file yet."
-
         prompt = f"""You are a guidance-only career assistant for an Indian engineering student.
 {context}
 Question: {user_question}
@@ -1642,8 +1022,7 @@ Answer helpfully in 3-5 sentences. Do not guarantee jobs, placements, salaries, 
     tts_source = st.radio(
         "Text to speak:",
         ["Type my own text", "Read my last roadmap (Tab 3)", "Read my last Q&A answer above"],
-        horizontal=False,
-        key="bulbul_source",
+        horizontal=False, key="bulbul_source",
     )
 
     if tts_source == "Type my own text":
@@ -1667,14 +1046,10 @@ Answer helpfully in 3-5 sentences. Do not guarantee jobs, placements, salaries, 
                 bulbul_audio, bulbul_err = sarvam_tts(tts_input_text, selected_lang_code, sarvam_key, speaker=selected_speaker)
             if bulbul_audio:
                 st.audio(bulbul_audio, format="audio/wav")
-                st.download_button(
-                    "⬇️ Download audio", data=bulbul_audio,
-                    file_name="bulbul_speech.wav", mime="audio/wav",
-                )
+                st.download_button("⬇️ Download audio", data=bulbul_audio, file_name="bulbul_speech.wav", mime="audio/wav")
             else:
                 st.error(f"🔇 {bulbul_err}")
 
-# ---------------------------- TAB 5: RESPONSIBLE AI + FEEDBACK ----------------------------
 with tab5:
     st.markdown("### Responsible AI Checklist")
     st.markdown("""
@@ -1689,6 +1064,20 @@ with tab5:
     </div>
     """, unsafe_allow_html=True)
 
+    st.markdown("### 🔗 Future Integration Touchpoints")
+    st.caption(
+        "Per the problem statement's integration/middleware guidance (section 12): actual portal "
+        "integration is not required for this prototype. These are the documented future connection "
+        "points — no live external calls are made from this app."
+    )
+    for item in FUTURE_INTEGRATIONS:
+        st.markdown(f"""
+        <div class="integration-card">
+            <b>{item['icon']} {item['name']}</b><br>
+            {item['how']}
+        </div>
+        """, unsafe_allow_html=True)
+
     st.markdown("### Feedback")
     with st.form("feedback_form"):
         rating = st.slider("How helpful was this session? (1-5)", 1, 5, 4)
@@ -1699,9 +1088,7 @@ with tab5:
     if fb_submit:
         st.session_state["feedback_log"].append({
             "timestamp": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "rating": rating,
-            "clear_next_step": helpful_flag,
-            "comment": comment,
+            "rating": rating, "clear_next_step": helpful_flag, "comment": comment,
         })
         st.success("Thanks — your feedback has been logged for this session.")
 
