@@ -1,4 +1,4 @@
-# 🧭 CareerCompass AI
+# 🧭 CareerCompass AI - Live demo -https://hcltechcareercompassai-dcb89vtyuckxsytaaudugx.streamlit.app/
 
 **AI Career Guidance Assistant for Tier-2/Tier-3 Engineering Students**
 Problem Statement 4 — HCLTech GET Hackathon Submission
