@@ -1,7 +1,7 @@
 # 🧭 CareerCompass AI - Live demo -https://hcltechcareercompassai-dcb89vtyuckxsytaaudugx.streamlit.app/
 
 **AI Career Guidance Assistant for Tier-2/Tier-3 Engineering Students**
-Problem Statement 4 — HCLTech GET Hackathon Submission
+
 
 A guidance-only career, skill-gap, and roadmap assistant for engineering students across CSE, IT, ECE, EE, ME, and Civil — grounded in prepared role data, not real-time job or placement guarantees.
 
